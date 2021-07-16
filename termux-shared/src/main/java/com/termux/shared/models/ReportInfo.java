@@ -1,14 +1,14 @@
-package com.termux.app.models;
+package com.termux.shared.models;
 
 import com.termux.shared.markdown.MarkdownUtils;
-import com.termux.shared.termux.TermuxUtils;
+import com.termux.shared.termux.AndroidUtils;
 
 import java.io.Serializable;
 
 public class ReportInfo implements Serializable {
 
     /** The user action that was being processed for which the report was generated. */
-    public final UserAction userAction;
+    public final String userAction;
     /** The internal app component that sent the report. */
     public final String sender;
     /** The report title. */
@@ -26,7 +26,7 @@ public class ReportInfo implements Serializable {
     /** The timestamp for the report. */
     public final String reportTimestamp;
 
-    public ReportInfo(UserAction userAction, String sender, String reportTitle, String reportStringPrefix, String reportString, String reportStringSuffix, boolean addReportInfoToMarkdown) {
+    public ReportInfo(String userAction, String sender, String reportTitle, String reportStringPrefix, String reportString, String reportStringSuffix, boolean addReportInfoToMarkdown) {
         this.userAction = userAction;
         this.sender = sender;
         this.reportTitle = reportTitle;
@@ -34,7 +34,7 @@ public class ReportInfo implements Serializable {
         this.reportString = reportString;
         this.reportStringSuffix = reportStringSuffix;
         this.addReportInfoToMarkdown = addReportInfoToMarkdown;
-        this.reportTimestamp = TermuxUtils.getCurrentTimeStamp();
+        this.reportTimestamp = AndroidUtils.getCurrentTimeStamp();
     }
 
     /**

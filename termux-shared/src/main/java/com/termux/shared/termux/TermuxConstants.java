@@ -2,10 +2,17 @@ package com.termux.shared.termux;
 
 import android.annotation.SuppressLint;
 
+import com.termux.shared.models.ResultConfig;
+import com.termux.shared.models.errors.Errno;
+
 import java.io.File;
+import java.util.Arrays;
+import java.util.Formatter;
+import java.util.IllegalFormatException;
+import java.util.List;
 
 /*
- * Version: v0.19.0
+ * Version: v0.24.0
  *
  * Changelog
  *
@@ -135,6 +142,36 @@ import java.io.File;
  *      - Added `TERMUX_SERVICE.EXTRA_STDIN`.
  *      - Added `RUN_COMMAND_SERVICE.EXTRA_STDIN`.
  *      - Deprecated `TERMUX_ACTIVITY.EXTRA_RELOAD_STYLE`.
+ *
+ * - 0.20.0 (2021-05-13)
+ *      - Added `TERMUX_WIKI`, `TERMUX_WIKI_URL`, `TERMUX_PLUGIN_APP_NAMES_LIST`, `TERMUX_PLUGIN_APP_PACKAGE_NAMES_LIST`.
+ *      - Added `TERMUX_SETTINGS_ACTIVITY_NAME`.
+ *
+ * - 0.21.0 (2021-05-13)
+ *      - Added `APK_RELEASE_FDROID`, `APK_RELEASE_FDROID_SIGNING_CERTIFICATE_SHA256_DIGEST`,
+ *          `APK_RELEASE_GITHUB_DEBUG_BUILD`, `APK_RELEASE_GITHUB_DEBUG_BUILD_SIGNING_CERTIFICATE_SHA256_DIGEST`,
+ *          `APK_RELEASE_GOOGLE_PLAYSTORE`, `APK_RELEASE_GOOGLE_PLAYSTORE_SIGNING_CERTIFICATE_SHA256_DIGEST`.
+ *
+ * - 0.22.0 (2021-05-13)
+ *      - Added `TERMUX_DONATE_URL`.
+ *
+ * - 0.23.0 (2021-06-12)
+ *      - Rename `INTERNAL_PRIVATE_APP_DATA_DIR_PATH` to `TERMUX_INTERNAL_PRIVATE_APP_DATA_DIR_PATH`.
+ *
+ * - 0.24.0 (2021-06-27)
+ *      - Add `COMMA_NORMAL`, `COMMA_ALTERNATIVE`.
+ *      - Added following to `TERMUX_APP.TERMUX_SERVICE`:
+ *          `EXTRA_RESULT_DIRECTORY`, `EXTRA_RESULT_SINGLE_FILE`, `EXTRA_RESULT_FILE_BASENAME`,
+ *          `EXTRA_RESULT_FILE_OUTPUT_FORMAT`, `EXTRA_RESULT_FILE_ERROR_FORMAT`, `EXTRA_RESULT_FILES_SUFFIX`.
+ *      - Added following to `TERMUX_APP.RUN_COMMAND_SERVICE`:
+ *          `EXTRA_RESULT_DIRECTORY`, `EXTRA_RESULT_SINGLE_FILE`, `EXTRA_RESULT_FILE_BASENAME`,
+ *          `EXTRA_RESULT_FILE_OUTPUT_FORMAT`, `EXTRA_RESULT_FILE_ERROR_FORMAT`, `EXTRA_RESULT_FILES_SUFFIX`,
+ *          `EXTRA_REPLACE_COMMA_ALTERNATIVE_CHARS_IN_ARGUMENTS`, `EXTRA_COMMA_ALTERNATIVE_CHARS_IN_ARGUMENTS`.
+ *      - Added following to `RESULT_SENDER`:
+ *           `FORMAT_SUCCESS_STDOUT`, `FORMAT_SUCCESS_STDOUT__EXIT_CODE`, `FORMAT_SUCCESS_STDOUT__STDERR__EXIT_CODE`
+ *           `FORMAT_FAILED_ERR__ERRMSG__STDOUT__STDERR__EXIT_CODE`,
+ *           `RESULT_FILE_ERR_PREFIX`, `RESULT_FILE_ERRMSG_PREFIX` `RESULT_FILE_STDOUT_PREFIX`,
+ *           `RESULT_FILE_STDERR_PREFIX`, `RESULT_FILE_EXIT_CODE_PREFIX`.
  */
 
 /**
@@ -188,18 +225,6 @@ public final class TermuxConstants {
     /** Termux Github organization url */
     public static final String TERMUX_GITHUB_ORGANIZATION_URL = "https://github.com" + "/" + TERMUX_GITHUB_ORGANIZATION_NAME; // Default: "https://github.com/termux"
 
-    /** Termux support email url */
-    public static final String TERMUX_SUPPORT_EMAIL_URL = "termuxreports@groups.io"; // Default: "termuxreports@groups.io"
-
-    /** Termux support email mailto url */
-    public static final String TERMUX_SUPPORT_EMAIL_MAILTO_URL = "mailto:" + TERMUX_SUPPORT_EMAIL_URL; // Default: "mailto:termuxreports@groups.io"
-
-    /** Termux Reddit subreddit */
-    public static final String TERMUX_REDDIT_SUBREDDIT = "r/termux"; // Default: "r/termux"
-
-    /** Termux Reddit subreddit url */
-    public static final String TERMUX_REDDIT_SUBREDDIT_URL = "https://www.reddit.com/r/termux"; // Default: "https://www.reddit.com/r/termux"
-
     /** F-Droid packages base url */
     public static final String FDROID_PACKAGES_BASE_URL = "https://f-droid.org/en/packages"; // Default: "https://f-droid.org/en/packages"
 
@@ -221,8 +246,6 @@ public final class TermuxConstants {
     public static final String TERMUX_GITHUB_REPO_URL = TERMUX_GITHUB_ORGANIZATION_URL + "/" + TERMUX_GITHUB_REPO_NAME; // Default: "https://github.com/termux/termux-app"
     /** Termux Github issues repo url */
     public static final String TERMUX_GITHUB_ISSUES_REPO_URL = TERMUX_GITHUB_REPO_URL + "/issues"; // Default: "https://github.com/termux/termux-app/issues"
-    /** Termux Github wiki repo url */
-    public static final String TERMUX_GITHUB_WIKI_REPO_URL = TERMUX_GITHUB_REPO_URL + "/wiki"; // Default: "https://github.com/termux/termux-app/wiki"
     /** Termux F-Droid package url */
     public static final String TERMUX_FDROID_PACKAGE_URL = FDROID_PACKAGES_BASE_URL + "/" + TERMUX_PACKAGE_NAME; // Default: "https://f-droid.org/en/packages/com.termux"
 
@@ -315,6 +338,56 @@ public final class TermuxConstants {
 
 
     /*
+     * Termux plugin apps lists.
+     */
+
+    public static final List<String> TERMUX_PLUGIN_APP_NAMES_LIST = Arrays.asList(
+        TERMUX_API_APP_NAME,
+        TERMUX_BOOT_APP_NAME,
+        TERMUX_FLOAT_APP_NAME,
+        TERMUX_STYLING_APP_NAME,
+        TERMUX_TASKER_APP_NAME,
+        TERMUX_WIDGET_APP_NAME);
+
+    public static final List<String> TERMUX_PLUGIN_APP_PACKAGE_NAMES_LIST = Arrays.asList(
+        TERMUX_API_PACKAGE_NAME,
+        TERMUX_BOOT_PACKAGE_NAME,
+        TERMUX_FLOAT_PACKAGE_NAME,
+        TERMUX_STYLING_PACKAGE_NAME,
+        TERMUX_TASKER_PACKAGE_NAME,
+        TERMUX_WIDGET_PACKAGE_NAME);
+
+
+
+
+
+    /*
+     * Termux APK releases.
+     */
+
+    /** F-Droid APK release */
+    public static final String APK_RELEASE_FDROID = "F-Droid"; // Default: "F-Droid"
+
+    /** F-Droid APK release signing certificate SHA-256 digest */
+    public static final String APK_RELEASE_FDROID_SIGNING_CERTIFICATE_SHA256_DIGEST = "228FB2CFE90831C1499EC3CCAF61E96E8E1CE70766B9474672CE427334D41C42"; // Default: "228FB2CFE90831C1499EC3CCAF61E96E8E1CE70766B9474672CE427334D41C42"
+
+    /** Github Debug Build APK release */
+    public static final String APK_RELEASE_GITHUB_DEBUG_BUILD = "Github Debug Build"; // Default: "Github Debug Build"
+
+    /** Github Debug Build APK release signing certificate SHA-256 digest */
+    public static final String APK_RELEASE_GITHUB_DEBUG_BUILD_SIGNING_CERTIFICATE_SHA256_DIGEST = "B6DA01480EEFD5FBF2CD3771B8D1021EC791304BDD6C4BF41D3FAABAD48EE5E1"; // Default: "B6DA01480EEFD5FBF2CD3771B8D1021EC791304BDD6C4BF41D3FAABAD48EE5E1"
+
+    /** Google Play Store APK release */
+    public static final String APK_RELEASE_GOOGLE_PLAYSTORE = "Google Play Store"; // Default: "Google Play Store"
+
+    /** Google Play Store APK release signing certificate SHA-256 digest */
+    public static final String APK_RELEASE_GOOGLE_PLAYSTORE_SIGNING_CERTIFICATE_SHA256_DIGEST = "738F0A30A04D3C8A1BE304AF18D0779BCF3EA88FB60808F657A3521861C2EBF9"; // Default: "738F0A30A04D3C8A1BE304AF18D0779BCF3EA88FB60808F657A3521861C2EBF9"
+
+
+
+
+
+    /*
      * Termux packages urls.
      */
 
@@ -324,8 +397,6 @@ public final class TermuxConstants {
     public static final String TERMUX_PACKAGES_GITHUB_REPO_URL = TERMUX_GITHUB_ORGANIZATION_URL + "/" + TERMUX_PACKAGES_GITHUB_REPO_NAME; // Default: "https://github.com/termux/termux-packages"
     /** Termux Packages Github issues repo url */
     public static final String TERMUX_PACKAGES_GITHUB_ISSUES_REPO_URL = TERMUX_PACKAGES_GITHUB_REPO_URL + "/issues"; // Default: "https://github.com/termux/termux-packages/issues"
-    /** Termux Packages wiki repo url */
-    public static final String TERMUX_PACKAGES_GITHUB_WIKI_REPO_URL = TERMUX_PACKAGES_GITHUB_REPO_URL + "/wiki"; // Default: "https://github.com/termux/termux-packages/wiki"
 
 
     /** Termux Game Packages Github repo name */
@@ -372,19 +443,57 @@ public final class TermuxConstants {
 
 
     /*
+     * Termux miscellaneous urls.
+     */
+
+    /** Termux Wiki */
+    public static final String TERMUX_WIKI = TERMUX_APP_NAME + " Wiki"; // Default: "Termux Wiki"
+
+    /** Termux Wiki url */
+    public static final String TERMUX_WIKI_URL = "https://wiki.termux.com"; // Default: "https://wiki.termux.com"
+
+    /** Termux Github wiki repo url */
+    public static final String TERMUX_GITHUB_WIKI_REPO_URL = TERMUX_GITHUB_REPO_URL + "/wiki"; // Default: "https://github.com/termux/termux-app/wiki"
+
+    /** Termux Packages wiki repo url */
+    public static final String TERMUX_PACKAGES_GITHUB_WIKI_REPO_URL = TERMUX_PACKAGES_GITHUB_REPO_URL + "/wiki"; // Default: "https://github.com/termux/termux-packages/wiki"
+
+
+    /** Termux support email url */
+    public static final String TERMUX_SUPPORT_EMAIL_URL = "termuxreports@groups.io"; // Default: "termuxreports@groups.io"
+
+    /** Termux support email mailto url */
+    public static final String TERMUX_SUPPORT_EMAIL_MAILTO_URL = "mailto:" + TERMUX_SUPPORT_EMAIL_URL; // Default: "mailto:termuxreports@groups.io"
+
+
+    /** Termux Reddit subreddit */
+    public static final String TERMUX_REDDIT_SUBREDDIT = "r/termux"; // Default: "r/termux"
+
+    /** Termux Reddit subreddit url */
+    public static final String TERMUX_REDDIT_SUBREDDIT_URL = "https://www.reddit.com/r/termux"; // Default: "https://www.reddit.com/r/termux"
+
+
+    /** Termux donate url */
+    public static final String TERMUX_DONATE_URL = TERMUX_PACKAGES_GITHUB_REPO_URL + "/wiki/Donate"; // Default: "https://github.com/termux/termux-packages/wiki/Donate"
+
+
+
+
+
+    /*
      * Termux app core directory paths.
      */
 
     /** Termux app internal private app data directory path */
     @SuppressLint("SdCardPath")
-    public static final String INTERNAL_PRIVATE_APP_DATA_DIR_PATH = "/data/data/" + TERMUX_PACKAGE_NAME; // Default: "/data/data/com.termux"
+    public static final String TERMUX_INTERNAL_PRIVATE_APP_DATA_DIR_PATH = "/data/data/" + TERMUX_PACKAGE_NAME; // Default: "/data/data/com.termux"
     /** Termux app internal private app data directory */
-    public static final File INTERNAL_PRIVATE_APP_DATA_DIR = new File(INTERNAL_PRIVATE_APP_DATA_DIR_PATH);
+    public static final File TERMUX_INTERNAL_PRIVATE_APP_DATA_DIR = new File(TERMUX_INTERNAL_PRIVATE_APP_DATA_DIR_PATH);
 
 
 
     /** Termux app Files directory path */
-    public static final String TERMUX_FILES_DIR_PATH = INTERNAL_PRIVATE_APP_DATA_DIR_PATH + "/files"; // Default: "/data/data/com.termux/files"
+    public static final String TERMUX_FILES_DIR_PATH = TERMUX_INTERNAL_PRIVATE_APP_DATA_DIR_PATH + "/files"; // Default: "/data/data/com.termux/files"
     /** Termux app Files directory */
     public static final File TERMUX_FILES_DIR = new File(TERMUX_FILES_DIR_PATH);
 
@@ -547,19 +656,22 @@ public final class TermuxConstants {
     public static final File TERMUX_BOOT_SCRIPTS_DIR = new File(TERMUX_BOOT_SCRIPTS_DIR_PATH);
 
 
-    /** Termux app directory path to store foreground scripts that can be run by the termux launcher widget provided by Termux:Widget */
+    /** Termux app directory path to store foreground scripts that can be run by the termux launcher
+     * widget provided by Termux:Widget */
     public static final String TERMUX_SHORTCUT_SCRIPTS_DIR_PATH = TERMUX_DATA_HOME_DIR_PATH + "/shortcuts"; // Default: "/data/data/com.termux/files/home/.termux/shortcuts"
     /** Termux app directory to store foreground scripts that can be run by the termux launcher widget provided by Termux:Widget */
     public static final File TERMUX_SHORTCUT_SCRIPTS_DIR = new File(TERMUX_SHORTCUT_SCRIPTS_DIR_PATH);
 
 
-    /** Termux app directory path to store background scripts that can be run by the termux launcher widget provided by Termux:Widget */
+    /** Termux app directory path to store background scripts that can be run by the termux launcher
+     * widget provided by Termux:Widget */
     public static final String TERMUX_SHORTCUT_TASKS_SCRIPTS_DIR_PATH = TERMUX_DATA_HOME_DIR_PATH + "/shortcuts/tasks"; // Default: "/data/data/com.termux/files/home/.termux/shortcuts/tasks"
     /** Termux app directory to store background scripts that can be run by the termux launcher widget provided by Termux:Widget */
     public static final File TERMUX_SHORTCUT_TASKS_SCRIPTS_DIR = new File(TERMUX_SHORTCUT_TASKS_SCRIPTS_DIR_PATH);
 
 
-    /** Termux app directory path to store scripts to be run by 3rd party twofortyfouram locale plugin host apps like Tasker app via the Termux:Tasker plugin client */
+    /** Termux app directory path to store scripts to be run by 3rd party twofortyfouram locale plugin
+     * host apps like Tasker app via the Termux:Tasker plugin client */
     public static final String TERMUX_TASKER_SCRIPTS_DIR_PATH = TERMUX_DATA_HOME_DIR_PATH + "/tasker"; // Default: "/data/data/com.termux/files/home/.termux/tasker"
     /** Termux app directory to store scripts to be run by 3rd party twofortyfouram locale plugin host apps like Tasker app via the Termux:Tasker plugin client */
     public static final File TERMUX_TASKER_SCRIPTS_DIR = new File(TERMUX_TASKER_SCRIPTS_DIR_PATH);
@@ -604,10 +716,12 @@ public final class TermuxConstants {
      * Termux app and plugins miscellaneous variables.
      */
 
-    /** Android OS permission declared by Termux app in AndroidManifest.xml which can be requested by 3rd party apps to run various commands in Termux app context */
+    /** Android OS permission declared by Termux app in AndroidManifest.xml which can be requested by
+     * 3rd party apps to run various commands in Termux app context */
     public static final String PERMISSION_RUN_COMMAND = TERMUX_PACKAGE_NAME + ".permission.RUN_COMMAND"; // Default: "com.termux.permission.RUN_COMMAND"
 
-    /** Termux property defined in termux.properties file as a secondary check to PERMISSION_RUN_COMMAND to allow 3rd party apps to run various commands in Termux app context */
+    /** Termux property defined in termux.properties file as a secondary check to PERMISSION_RUN_COMMAND
+     * to allow 3rd party apps to run various commands in Termux app context */
     public static final String PROP_ALLOW_EXTERNAL_APPS = "allow-external-apps"; // Default: "allow-external-apps"
     /** Default value for {@link #PROP_ALLOW_EXTERNAL_APPS} */
     public static final String PROP_DEFAULT_VALUE_ALLOW_EXTERNAL_APPS = "false"; // Default: "false"
@@ -617,6 +731,14 @@ public final class TermuxConstants {
 
     /** The Uri authority for Termux app file shares */
     public static final String TERMUX_FILE_SHARE_URI_AUTHORITY = TERMUX_PACKAGE_NAME + ".files"; // Default: "com.termux.files"
+
+    /** The normal comma character (U+002C, &comma;, &#44;, comma) */
+    public static final String COMMA_NORMAL = ","; // Default: ","
+
+    /** The alternate comma character (U+201A, &sbquo;, &#8218;, single low-9 quotation mark) that
+     * may be used instead of {@link #COMMA_NORMAL} */
+    public static final String COMMA_ALTERNATIVE = "‚"; // Default: "‚"
+
 
 
 
@@ -654,6 +776,13 @@ public final class TermuxConstants {
 
 
 
+        /** Termux app settings activity name. */
+        public static final String TERMUX_SETTINGS_ACTIVITY_NAME = TERMUX_PACKAGE_NAME + ".app.activities.SettingsActivity"; // Default: "com.termux.app.activities.SettingsActivity"
+
+
+
+
+
         /** Termux app core service name. */
         public static final String TERMUX_SERVICE_NAME = TERMUX_PACKAGE_NAME + ".app.TermuxService"; // Default: "com.termux.app.TermuxService"
 
@@ -676,6 +805,7 @@ public final class TermuxConstants {
 
             /** Intent action to execute command with TERMUX_SERVICE */
             public static final String ACTION_SERVICE_EXECUTE = TERMUX_PACKAGE_NAME + ".service_execute"; // Default: "com.termux.service_execute"
+
             /** Uri scheme for paths sent via intent to TERMUX_SERVICE */
             public static final String URI_SCHEME_SERVICE_EXECUTE = TERMUX_PACKAGE_NAME + ".file"; // Default: "com.termux.file"
             /** Intent {@code String[]} extra for arguments to the executable of the command for the TERMUX_SERVICE.ACTION_SERVICE_EXECUTE intent */
@@ -696,8 +826,30 @@ public final class TermuxConstants {
             public static final String EXTRA_COMMAND_HELP = TERMUX_PACKAGE_NAME + ".execute.command_help"; // Default: "com.termux.execute.command_help"
             /** Intent markdown {@code String} extra for help of the plugin API for the TERMUX_SERVICE.ACTION_SERVICE_EXECUTE intent (Internal Use Only) */
             public static final String EXTRA_PLUGIN_API_HELP = TERMUX_PACKAGE_NAME + ".execute.plugin_api_help"; // Default: "com.termux.execute.plugin_help"
-            /** Intent {@code Parcelable} extra containing pending intent for the execute command caller */
+            /** Intent {@code Parcelable} extra for the pending intent that should be sent with the
+             * result of the execution command to the execute command caller for the TERMUX_SERVICE.ACTION_SERVICE_EXECUTE intent */
             public static final String EXTRA_PENDING_INTENT = "pendingIntent"; // Default: "pendingIntent"
+            /** Intent {@code String} extra for the directory path in which to write the result of the
+             * execution command for the execute command caller for the TERMUX_SERVICE.ACTION_SERVICE_EXECUTE intent */
+            public static final String EXTRA_RESULT_DIRECTORY = TERMUX_PACKAGE_NAME + ".execute.result_directory"; // Default: "com.termux.execute.result_directory"
+            /** Intent {@code boolean} extra for whether the result should be written to a single file
+             * or multiple files (err, errmsg, stdout, stderr, exit_code) in
+             * {@link #EXTRA_RESULT_DIRECTORY} for the TERMUX_SERVICE.ACTION_SERVICE_EXECUTE intent */
+            public static final String EXTRA_RESULT_SINGLE_FILE = TERMUX_PACKAGE_NAME + ".execute.result_single_file"; // Default: "com.termux.execute.result_single_file"
+            /** Intent {@code String} extra for the basename of the result file that should be created
+             * in {@link #EXTRA_RESULT_DIRECTORY} if {@link #EXTRA_RESULT_SINGLE_FILE} is {@code true}
+             * for the TERMUX_SERVICE.ACTION_SERVICE_EXECUTE intent */
+            public static final String EXTRA_RESULT_FILE_BASENAME = TERMUX_PACKAGE_NAME + ".execute.result_file_basename"; // Default: "com.termux.execute.result_file_basename"
+            /** Intent {@code String} extra for the output {@link Formatter} format of the
+             * {@link #EXTRA_RESULT_FILE_BASENAME} result file for the TERMUX_SERVICE.ACTION_SERVICE_EXECUTE intent */
+            public static final String EXTRA_RESULT_FILE_OUTPUT_FORMAT = TERMUX_PACKAGE_NAME + ".execute.result_file_output_format"; // Default: "com.termux.execute.result_file_output_format"
+            /** Intent {@code String} extra for the error {@link Formatter} format of the
+             * {@link #EXTRA_RESULT_FILE_BASENAME} result file for the TERMUX_SERVICE.ACTION_SERVICE_EXECUTE intent */
+            public static final String EXTRA_RESULT_FILE_ERROR_FORMAT = TERMUX_PACKAGE_NAME + ".execute.result_file_error_format"; // Default: "com.termux.execute.result_file_error_format"
+            /** Intent {@code String} extra for the optional suffix of the result files that should
+             * be created in {@link #EXTRA_RESULT_DIRECTORY} if {@link #EXTRA_RESULT_SINGLE_FILE} is
+             * {@code false} for the TERMUX_SERVICE.ACTION_SERVICE_EXECUTE intent */
+            public static final String EXTRA_RESULT_FILES_SUFFIX = TERMUX_PACKAGE_NAME + ".execute.result_files_suffix"; // Default: "com.termux.execute.result_files_suffix"
 
 
 
@@ -768,12 +920,19 @@ public final class TermuxConstants {
             /** Termux RUN_COMMAND Intent help url */
             public static final String RUN_COMMAND_API_HELP_URL = TERMUX_GITHUB_WIKI_REPO_URL + "/RUN_COMMAND-Intent"; // Default: "https://github.com/termux/termux-app/wiki/RUN_COMMAND-Intent"
 
+
             /** Intent action to execute command with RUN_COMMAND_SERVICE */
             public static final String ACTION_RUN_COMMAND = TERMUX_PACKAGE_NAME + ".RUN_COMMAND"; // Default: "com.termux.RUN_COMMAND"
+
             /** Intent {@code String} extra for absolute path of command for the RUN_COMMAND_SERVICE.ACTION_RUN_COMMAND intent */
             public static final String EXTRA_COMMAND_PATH = TERMUX_PACKAGE_NAME + ".RUN_COMMAND_PATH"; // Default: "com.termux.RUN_COMMAND_PATH"
             /** Intent {@code String[]} extra for arguments to the executable of the command for the RUN_COMMAND_SERVICE.ACTION_RUN_COMMAND intent */
             public static final String EXTRA_ARGUMENTS = TERMUX_PACKAGE_NAME + ".RUN_COMMAND_ARGUMENTS"; // Default: "com.termux.RUN_COMMAND_ARGUMENTS"
+            /** Intent {@code boolean} extra for whether to replace comma alternative characters in arguments with comma characters for the RUN_COMMAND_SERVICE.ACTION_RUN_COMMAND intent */
+            public static final String EXTRA_REPLACE_COMMA_ALTERNATIVE_CHARS_IN_ARGUMENTS = TERMUX_PACKAGE_NAME + ".RUN_COMMAND_REPLACE_COMMA_ALTERNATIVE_CHARS_IN_ARGUMENTS"; // Default: "com.termux.RUN_COMMAND_REPLACE_COMMA_ALTERNATIVE_CHARS_IN_ARGUMENTS"
+            /** Intent {@code String} extra for the comma alternative characters in arguments that should be replaced instead of the default {@link #COMMA_ALTERNATIVE} for the RUN_COMMAND_SERVICE.ACTION_RUN_COMMAND intent */
+            public static final String EXTRA_COMMA_ALTERNATIVE_CHARS_IN_ARGUMENTS = TERMUX_PACKAGE_NAME + ".RUN_COMMAND_COMMA_ALTERNATIVE_CHARS_IN_ARGUMENTS"; // Default: "com.termux.RUN_COMMAND_COMMA_ALTERNATIVE_CHARS_IN_ARGUMENTS"
+
             /** Intent {@code String} extra for stdin of the command for the RUN_COMMAND_SERVICE.ACTION_RUN_COMMAND intent */
             public static final String EXTRA_STDIN = TERMUX_PACKAGE_NAME + ".RUN_COMMAND_STDIN"; // Default: "com.termux.RUN_COMMAND_STDIN"
             /** Intent {@code String} extra for current working directory of command for the RUN_COMMAND_SERVICE.ACTION_RUN_COMMAND intent */
@@ -788,10 +947,99 @@ public final class TermuxConstants {
             public static final String EXTRA_COMMAND_DESCRIPTION = TERMUX_PACKAGE_NAME + ".RUN_COMMAND_COMMAND_DESCRIPTION"; // Default: "com.termux.RUN_COMMAND_COMMAND_DESCRIPTION"
             /** Intent markdown {@code String} extra for help of the command for the RUN_COMMAND_SERVICE.ACTION_RUN_COMMAND intent */
             public static final String EXTRA_COMMAND_HELP = TERMUX_PACKAGE_NAME + ".RUN_COMMAND_COMMAND_HELP"; // Default: "com.termux.RUN_COMMAND_COMMAND_HELP"
-            /** Intent {@code Parcelable} extra containing pending intent for the RUN_COMMAND_SERVICE.ACTION_RUN_COMMAND intent */
+            /** Intent {@code Parcelable} extra for the pending intent that should be sent with the result of the execution command to the execute command caller for the RUN_COMMAND_SERVICE.ACTION_RUN_COMMAND intent */
             public static final String EXTRA_PENDING_INTENT = TERMUX_PACKAGE_NAME + ".RUN_COMMAND_PENDING_INTENT"; // Default: "com.termux.RUN_COMMAND_PENDING_INTENT"
+            /** Intent {@code String} extra for the directory path in which to write the result of
+             * the execution command for the execute command caller for the RUN_COMMAND_SERVICE.ACTION_RUN_COMMAND intent */
+            public static final String EXTRA_RESULT_DIRECTORY = TERMUX_PACKAGE_NAME + ".RUN_COMMAND_RESULT_DIRECTORY"; // Default: "com.termux.RUN_COMMAND_RESULT_DIRECTORY"
+            /** Intent {@code boolean} extra for whether the result should be written to a single file
+             * or multiple files (err, errmsg, stdout, stderr, exit_code) in
+             * {@link #EXTRA_RESULT_DIRECTORY} for the RUN_COMMAND_SERVICE.ACTION_RUN_COMMAND intent */
+            public static final String EXTRA_RESULT_SINGLE_FILE = TERMUX_PACKAGE_NAME + ".RUN_COMMAND_RESULT_SINGLE_FILE"; // Default: "com.termux.RUN_COMMAND_RESULT_SINGLE_FILE"
+            /** Intent {@code String} extra for the basename of the result file that should be created
+             * in {@link #EXTRA_RESULT_DIRECTORY} if {@link #EXTRA_RESULT_SINGLE_FILE} is {@code true}
+             * for the RUN_COMMAND_SERVICE.ACTION_RUN_COMMAND intent */
+            public static final String EXTRA_RESULT_FILE_BASENAME = TERMUX_PACKAGE_NAME + ".RUN_COMMAND_RESULT_FILE_BASENAME"; // Default: "com.termux.RUN_COMMAND_RESULT_FILE_BASENAME"
+            /** Intent {@code String} extra for the output {@link Formatter} format of the
+             * {@link #EXTRA_RESULT_FILE_BASENAME} result file for the RUN_COMMAND_SERVICE.ACTION_RUN_COMMAND intent */
+            public static final String EXTRA_RESULT_FILE_OUTPUT_FORMAT = TERMUX_PACKAGE_NAME + ".RUN_COMMAND_RESULT_FILE_OUTPUT_FORMAT"; // Default: "com.termux.RUN_COMMAND_RESULT_FILE_OUTPUT_FORMAT"
+            /** Intent {@code String} extra for the error {@link Formatter} format of the
+             * {@link #EXTRA_RESULT_FILE_BASENAME} result file for the RUN_COMMAND_SERVICE.ACTION_RUN_COMMAND intent */
+            public static final String EXTRA_RESULT_FILE_ERROR_FORMAT = TERMUX_PACKAGE_NAME + ".RUN_COMMAND_RESULT_FILE_ERROR_FORMAT"; // Default: "com.termux.RUN_COMMAND_RESULT_FILE_ERROR_FORMAT"
+            /** Intent {@code String} extra for the optional suffix of the result files that should be
+             * created in {@link #EXTRA_RESULT_DIRECTORY} if {@link #EXTRA_RESULT_SINGLE_FILE} is
+             * {@code false} for the RUN_COMMAND_SERVICE.ACTION_RUN_COMMAND intent */
+            public static final String EXTRA_RESULT_FILES_SUFFIX = TERMUX_PACKAGE_NAME + ".RUN_COMMAND_RESULT_FILES_SUFFIX"; // Default: "com.termux.RUN_COMMAND_RESULT_FILES_SUFFIX"
 
         }
+    }
+
+
+
+
+
+    /**
+     * Termux class to send back results of commands to their callers like plugin or 3rd party apps.
+     */
+    public static final class RESULT_SENDER {
+
+        /*
+         * The default `Formatter` format strings to use for `ResultConfig#resultFileBasename`
+         * if `ResultConfig#resultSingleFile` is `true`.
+         */
+
+        /** The {@link Formatter} format string for success if only `stdout` needs to be written to
+         * {@link ResultConfig#resultFileBasename} where `stdout` maps to `%1$s`.
+         * This is used when `err` equals {@link Errno#ERRNO_SUCCESS} (-1) and `stderr` is empty
+         * and `exit_code` equals `0` and {@link ResultConfig#resultFileOutputFormat} is not passed. */
+        public static final String FORMAT_SUCCESS_STDOUT = "%1$s%n";
+        /** The {@link Formatter} format string for success if `stdout` and `exit_code` need to be written to
+         * {@link ResultConfig#resultFileBasename} where `stdout` maps to `%1$s` and `exit_code` to `%2$s`.
+         * This is used when `err` equals {@link Errno#ERRNO_SUCCESS} (-1) and `stderr` is empty
+         * and `exit_code` does not equal `0` and {@link ResultConfig#resultFileOutputFormat} is not passed.
+         * The exit code will be placed in a markdown inline code. */
+        public static final String FORMAT_SUCCESS_STDOUT__EXIT_CODE = "%1$s%n%n%n%nexit_code=%2$s%n";
+        /** The {@link Formatter} format string for success if `stdout`, `stderr` and `exit_code` need to be
+         * written to {@link ResultConfig#resultFileBasename} where `stdout` maps to `%1$s`, `stderr`
+         * maps to `%2$s` and `exit_code` to `%3$s`.
+         * This is used when `err` equals {@link Errno#ERRNO_SUCCESS} (-1) and `stderr` is not empty
+         * and {@link ResultConfig#resultFileOutputFormat} is not passed.
+         * The stdout and stderr will be placed in a markdown code block. The exit code will be placed
+         * in a markdown inline code. The surrounding backticks will be 3 more than the consecutive
+         * backticks in any parameter itself for code blocks. */
+        public static final String FORMAT_SUCCESS_STDOUT__STDERR__EXIT_CODE = "stdout=%n%1$s%n%n%n%nstderr=%n%2$s%n%n%n%nexit_code=%3$s%n";
+        /** The {@link Formatter} format string for failure if `err`, `errmsg`(`error`), `stdout`,
+         * `stderr` and `exit_code` need to be written to {@link ResultConfig#resultFileBasename} where
+         * `err` maps to `%1$s`, `errmsg` maps to `%2$s`, `stdout` maps
+         * to `%3$s`, `stderr` to `%4$s` and `exit_code` maps to `%5$s`.
+         * Do not define an argument greater than `5`, like `%6$s` if you change this value since it will
+         * raise {@link IllegalFormatException}.
+         * This is used when `err` does not equal {@link Errno#ERRNO_SUCCESS} (-1) and
+         * {@link ResultConfig#resultFileErrorFormat} is not passed.
+         * The errmsg, stdout and stderr will be placed in a markdown code block. The err and exit code
+         * will be placed in a markdown inline code. The surrounding backticks will be 3 more than
+         * the consecutive backticks in any parameter itself for code blocks. The stdout, stderr
+         * and exit code may be empty without any surrounding backticks if not set. */
+        public static final String FORMAT_FAILED_ERR__ERRMSG__STDOUT__STDERR__EXIT_CODE = "err=%1$s%n%n%n%nerrmsg=%n%2$s%n%n%n%nstdout=%n%3$s%n%n%n%nstderr=%n%4$s%n%n%n%nexit_code=%5$s%n";
+
+
+
+        /*
+         * The default prefixes to use for result files under `ResultConfig#resultDirectoryPath`
+         * if `ResultConfig#resultSingleFile` is `false`.
+         */
+
+        /** The prefix for the err result file. */
+        public static final String RESULT_FILE_ERR_PREFIX = "err";
+        /** The prefix for the errmsg result file. */
+        public static final String RESULT_FILE_ERRMSG_PREFIX = "errmsg";
+        /** The prefix for the stdout result file. */
+        public static final String RESULT_FILE_STDOUT_PREFIX = "stdout";
+        /** The prefix for the stderr result file. */
+        public static final String RESULT_FILE_STDERR_PREFIX = "stderr";
+        /** The prefix for the exitCode result file. */
+        public static final String RESULT_FILE_EXIT_CODE_PREFIX = "exit_code";
+
     }
 
 

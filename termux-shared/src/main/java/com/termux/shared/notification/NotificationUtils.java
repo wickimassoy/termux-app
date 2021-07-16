@@ -10,9 +10,6 @@ import android.os.Build;
 import androidx.annotation.Nullable;
 
 import com.termux.shared.logger.Logger;
-import com.termux.shared.settings.preferences.TermuxAppSharedPreferences;
-import com.termux.shared.settings.preferences.TermuxPreferenceConstants;
-import com.termux.shared.termux.TermuxConstants;
 
 public class NotificationUtils {
 
@@ -50,38 +47,11 @@ public class NotificationUtils {
     }
 
     /**
-     * Try to get the next unique notification id that isn't already being used by the app.
-     *
-     * Termux app and its plugin must use unique notification ids from the same pool due to usage of android:sharedUserId.
-     * https://commonsware.com/blog/2017/06/07/jobscheduler-job-ids-libraries.html
-     *
-     * @param context The {@link Context} for operations.
-     * @return Returns the notification id that should be safe to use.
-     */
-    public synchronized static int getNextNotificationId(final Context context) {
-        if (context == null) return TermuxPreferenceConstants.TERMUX_APP.DEFAULT_VALUE_KEY_LAST_NOTIFICATION_ID;
-
-        TermuxAppSharedPreferences preferences = new TermuxAppSharedPreferences(context);
-        int lastNotificationId = preferences.getLastNotificationId();
-
-        int nextNotificationId = lastNotificationId + 1;
-        while(nextNotificationId == TermuxConstants.TERMUX_APP_NOTIFICATION_ID || nextNotificationId == TermuxConstants.TERMUX_RUN_COMMAND_NOTIFICATION_ID) {
-            nextNotificationId++;
-        }
-
-        if (nextNotificationId == Integer.MAX_VALUE || nextNotificationId < 0)
-            nextNotificationId = TermuxPreferenceConstants.TERMUX_APP.DEFAULT_VALUE_KEY_LAST_NOTIFICATION_ID;
-
-        preferences.setLastNotificationId(nextNotificationId);
-        return nextNotificationId;
-    }
-
-    /**
      * Get {@link Notification.Builder}.
      *
      * @param context The {@link Context} for operations.
      * @param title The title for the notification.
-     * @param notifiationText The second line text of the notification.
+     * @param notificationText The second line text of the notification.
      * @param notificationBigText The full text of the notification that may optionally be styled.
      * @param pendingIntent The {@link PendingIntent} which should be sent when notification is clicked.
      * @param notificationMode The notification mode. It must be one of {@code NotificationUtils.NOTIFICATION_MODE_*}.
@@ -90,11 +60,11 @@ public class NotificationUtils {
      * @return Returns the {@link Notification.Builder}.
      */
     @Nullable
-    public static Notification.Builder geNotificationBuilder(final Context context, final String channelId, final int priority, final CharSequence title, final CharSequence notifiationText, final CharSequence notificationBigText, final PendingIntent pendingIntent, final int notificationMode) {
+    public static Notification.Builder geNotificationBuilder(final Context context, final String channelId, final int priority, final CharSequence title, final CharSequence notificationText, final CharSequence notificationBigText, final PendingIntent pendingIntent, final int notificationMode) {
         if (context == null) return null;
         Notification.Builder builder = new Notification.Builder(context);
         builder.setContentTitle(title);
-        builder.setContentText(notifiationText);
+        builder.setContentText(notificationText);
         builder.setStyle(new Notification.BigTextStyle().bigText(notificationBigText));
         builder.setContentIntent(pendingIntent);
 

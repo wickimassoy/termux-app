@@ -8,6 +8,8 @@ import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Typeface;
 import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.Editable;
 import android.text.InputType;
 import android.text.TextUtils;
@@ -51,6 +53,13 @@ public final class TerminalView extends View {
     public TerminalViewClient mClient;
 
     private TextSelectionCursorController mTextSelectionCursorController;
+
+    private Handler mTerminalCursorBlinkerHandler;
+    private TerminalCursorBlinkerRunnable mTerminalCursorBlinkerRunnable;
+    private int mTerminalCursorBlinkerRate;
+    private boolean mCursorInvisibleIgnoreOnce;
+    public static final int TERMINAL_CURSOR_BLINK_RATE_MIN = 100;
+    public static final int TERMINAL_CURSOR_BLINK_RATE_MAX = 2000;
 
     /** The top row of text to display. Ranges from -activeTranscriptRows to 0. */
     int mTopRow;
@@ -209,6 +218,8 @@ public final class TerminalView extends View {
         mAccessibilityEnabled = am.isEnabled();
     }
 
+
+
     /**
      * @param client The {@link TerminalViewClient} interface implementation to allow
      *                           for communication between {@link TerminalView} and its client.
@@ -218,13 +229,15 @@ public final class TerminalView extends View {
     }
 
     /**
-     * Sets terminal view key logging is enabled or not.
+     * Sets whether terminal view key logging is enabled or not.
      *
      * @param value The boolean value that defines the state.
      */
     public void setIsTerminalViewKeyLoggingEnabled(boolean value) {
         TERMINAL_VIEW_KEY_LOGGING_ENABLED = value;
     }
+
+
 
     /**
      * Attach a {@link TerminalSession} to this view.
@@ -685,6 +698,10 @@ public final class TerminalView extends View {
 
     /** Input the specified keyCode if applicable and return if the input was consumed. */
     public boolean handleKeyCode(int keyCode, int keyMod) {
+        // Ensure cursor is shown when a key is pressed down like long hold on (arrow) keys
+        if (mEmulator != null)
+            mEmulator.setCursorBlinkState(true);
+
         TerminalEmulator term = mTermSession.getEmulator();
         String code = KeyHandler.getCode(keyCode, keyMod, term.isCursorKeysApplicationMode(), term.isKeypadApplicationMode());
         if (code == null) return false;
@@ -703,7 +720,10 @@ public final class TerminalView extends View {
     public boolean onKeyUp(int keyCode, KeyEvent event) {
         if (TERMINAL_VIEW_KEY_LOGGING_ENABLED)
             mClient.logInfo(LOG_TAG, "onKeyUp(keyCode=" + keyCode + ", event=" + event + ")");
-        if (mEmulator == null) return true;
+
+        // Do not return for KEYCODE_BACK and send it to the client since user may be trying
+        // to exit the activity.
+        if (mEmulator == null && keyCode != KeyEvent.KEYCODE_BACK) return true;
 
         if (mClient.onKeyUp(keyCode, event)) {
             invalidate();
@@ -738,6 +758,11 @@ public final class TerminalView extends View {
         if (mEmulator == null || (newColumns != mEmulator.mColumns || newRows != mEmulator.mRows)) {
             mTermSession.updateSize(newColumns, newRows);
             mEmulator = mTermSession.getEmulator();
+            mClient.onEmulatorSet();
+
+            // Update mTerminalCursorBlinkerRunnable inner class mEmulator on session change
+            if (mTerminalCursorBlinkerRunnable != null)
+                mTerminalCursorBlinkerRunnable.setEmulator(mEmulator);
 
             mTopRow = 0;
             scrollTo(0, 0);
@@ -755,6 +780,7 @@ public final class TerminalView extends View {
             if (mTextSelectionCursorController != null) {
                 mTextSelectionCursorController.getSelectors(sel);
             }
+
             mRenderer.render(mEmulator, canvas, mTopRow, sel[0], sel[1], sel[2], sel[3]);
 
             // render the text selection handles
@@ -799,7 +825,6 @@ public final class TerminalView extends View {
 
 
 
-
     /**
      * Define functions required for AutoFill API
      */
@@ -823,6 +848,165 @@ public final class TerminalView extends View {
         return AutofillValue.forText("");
     }
 
+
+
+    /**
+     * Set terminal cursor blinker rate. It must be between {@link #TERMINAL_CURSOR_BLINK_RATE_MIN}
+     * and {@link #TERMINAL_CURSOR_BLINK_RATE_MAX}, otherwise it will be disabled.
+     *
+     * The {@link #setTerminalCursorBlinkerState(boolean, boolean)} must be called after this
+     * for changes to take effect if not disabling.
+     *
+     * @param blinkRate The value to set.
+     * @return Returns {@code true} if setting blinker rate was successfully set, otherwise [@code false}.
+     */
+    public synchronized boolean setTerminalCursorBlinkerRate(int blinkRate) {
+        boolean result;
+
+        // If cursor blinking rate is not valid
+        if (blinkRate != 0 && (blinkRate < TERMINAL_CURSOR_BLINK_RATE_MIN || blinkRate > TERMINAL_CURSOR_BLINK_RATE_MAX)) {
+            mClient.logError(LOG_TAG, "The cursor blink rate must be in between " + TERMINAL_CURSOR_BLINK_RATE_MIN + "-" + TERMINAL_CURSOR_BLINK_RATE_MAX + ": " + blinkRate);
+            mTerminalCursorBlinkerRate = 0;
+            result = false;
+        } else {
+            mClient.logVerbose(LOG_TAG, "Setting cursor blinker rate to " + blinkRate);
+            mTerminalCursorBlinkerRate = blinkRate;
+            result = true;
+        }
+
+        if (mTerminalCursorBlinkerRate == 0) {
+            mClient.logVerbose(LOG_TAG, "Cursor blinker disabled");
+            stopTerminalCursorBlinker();
+        }
+
+        return result;
+    }
+
+    /**
+     * Sets whether cursor blinker should be started or stopped. Cursor blinker will only be
+     * started if {@link #mTerminalCursorBlinkerRate} does not equal 0 and is between
+     * {@link #TERMINAL_CURSOR_BLINK_RATE_MIN} and {@link #TERMINAL_CURSOR_BLINK_RATE_MAX}.
+     *
+     * This should be called when the view holding this activity is resumed or stopped so that
+     * cursor blinker does not run when activity is not visible. If you call this on onResume()
+     * to start cursor blinking, then ensure that {@link #mEmulator} is set, otherwise wait for the
+     * {@link TerminalViewClient#onEmulatorSet()} event after calling {@link #attachSession(TerminalSession)}
+     * for the first session added in the activity since blinking will not start if {@link #mEmulator}
+     * is not set, like if activity is started again after exiting it with double back press. Do not
+     * call this directly after {@link #attachSession(TerminalSession)} since {@link #updateSize()}
+     * may return without setting {@link #mEmulator} since width/height may be 0. Its called again in
+     * {@link #onSizeChanged(int, int, int, int)}. Calling on onResume() if emulator is already set
+     * is necessary, since onEmulatorSet() may not be called after activity is started after device
+     * display timeout with double tap and not power button.
+     *
+     * It should also be called on the
+     * {@link com.termux.terminal.TerminalSessionClient#onTerminalCursorStateChange(boolean)}
+     * callback when cursor is enabled or disabled so that blinker is disabled if cursor is not
+     * to be shown. It should also be checked if activity is visible if blinker is to be started
+     * before calling this.
+     *
+     * It should also be called after terminal is reset with {@link TerminalSession#reset()} in case
+     * cursor blinker was disabled before reset due to call to
+     * {@link com.termux.terminal.TerminalSessionClient#onTerminalCursorStateChange(boolean)}.
+     *
+     * How cursor blinker starting works is by registering a {@link Runnable} with the looper of
+     * the main thread of the app which when run, toggles the cursor blinking state and re-registers
+     * itself to be called with the delay set by {@link #mTerminalCursorBlinkerRate}. When cursor
+     * blinking needs to be disabled, we just cancel any callbacks registered. We don't run our own
+     * "thread" and let the thread for the main looper do the work for us, whose usage is also
+     * required to update the UI, since it also handles other calls to update the UI as well based
+     * on a queue.
+     *
+     * Note that when moving cursor in text editors like nano, the cursor state is quickly
+     * toggled `-> off -> on`, which would call this very quickly sequentially. So that if cursor
+     * is moved 2 or more times quickly, like long hold on arrow keys, it would trigger
+     * `-> off -> on -> off -> on -> ...`, and the "on" callback at index 2 is automatically
+     * cancelled by next "off" callback at index 3 before getting a chance to be run. For this case
+     * we log only if {@link #TERMINAL_VIEW_KEY_LOGGING_ENABLED} is enabled, otherwise would clutter
+     * the log. We don't start the blinking with a delay to immediately show cursor in case it was
+     * previously not visible.
+     *
+     * @param start If cursor blinker should be started or stopped.
+     * @param startOnlyIfCursorEnabled If set to {@code true}, then it will also be checked if the
+     *                                 cursor is even enabled by {@link TerminalEmulator} before
+     *                                 starting the cursor blinker.
+     */
+    public synchronized void setTerminalCursorBlinkerState(boolean start, boolean startOnlyIfCursorEnabled) {
+        // Stop any existing cursor blinker callbacks
+        stopTerminalCursorBlinker();
+
+        if (mEmulator == null) return;
+
+        mEmulator.setCursorBlinkingEnabled(false);
+
+        if (start) {
+            // If cursor blinker is not enabled or is not valid
+            if (mTerminalCursorBlinkerRate < TERMINAL_CURSOR_BLINK_RATE_MIN || mTerminalCursorBlinkerRate > TERMINAL_CURSOR_BLINK_RATE_MAX)
+                return;
+            // If cursor blinder is to be started only if cursor is enabled
+            else if (startOnlyIfCursorEnabled && ! mEmulator.isCursorEnabled()) {
+                if (TERMINAL_VIEW_KEY_LOGGING_ENABLED)
+                    mClient.logVerbose(LOG_TAG, "Ignoring call to start cursor blinker since cursor is not enabled");
+                return;
+            }
+
+            // Start cursor blinker runnable
+            if (TERMINAL_VIEW_KEY_LOGGING_ENABLED)
+                mClient.logVerbose(LOG_TAG, "Starting cursor blinker with the blink rate " + mTerminalCursorBlinkerRate);
+            if (mTerminalCursorBlinkerHandler == null)
+                mTerminalCursorBlinkerHandler = new Handler(Looper.getMainLooper());
+            mTerminalCursorBlinkerRunnable = new TerminalCursorBlinkerRunnable(mEmulator, mTerminalCursorBlinkerRate);
+            mEmulator.setCursorBlinkingEnabled(true);
+            mTerminalCursorBlinkerRunnable.run();
+        }
+    }
+
+    /**
+     * Cancel the terminal cursor blinker callbacks
+     */
+    private void stopTerminalCursorBlinker() {
+        if (mTerminalCursorBlinkerHandler != null && mTerminalCursorBlinkerRunnable != null) {
+            if (TERMINAL_VIEW_KEY_LOGGING_ENABLED)
+                mClient.logVerbose(LOG_TAG, "Stopping cursor blinker");
+            mTerminalCursorBlinkerHandler.removeCallbacks(mTerminalCursorBlinkerRunnable);
+        }
+    }
+
+    private class TerminalCursorBlinkerRunnable implements Runnable {
+
+        private TerminalEmulator mEmulator;
+        private final int mBlinkRate;
+
+        // Initialize with false so that initial blink state is visible after toggling
+        boolean mCursorVisible = false;
+
+        public TerminalCursorBlinkerRunnable(TerminalEmulator emulator, int blinkRate) {
+            mEmulator = emulator;
+            mBlinkRate = blinkRate;
+        }
+
+        public void setEmulator(TerminalEmulator emulator) {
+            mEmulator = emulator;
+        }
+
+        public void run() {
+            try {
+                if (mEmulator != null) {
+                    // Toggle the blink state and then invalidate() the view so
+                    // that onDraw() is called, which then calls TerminalRenderer.render()
+                    // which checks with TerminalEmulator.shouldCursorBeVisible() to decide whether
+                    // to draw the cursor or not
+                    mCursorVisible = !mCursorVisible;
+                    //mClient.logVerbose(LOG_TAG, "Toggling cursor blink state to " + mCursorVisible);
+                    mEmulator.setCursorBlinkState(mCursorVisible);
+                    invalidate();
+                }
+            } finally {
+                // Recall the Runnable after mBlinkRate milliseconds to toggle the blink state
+                mTerminalCursorBlinkerHandler.postDelayed(this, mBlinkRate);
+            }
+        }
+    }
 
 
 
@@ -917,7 +1101,6 @@ public final class TerminalView extends View {
             mTextSelectionCursorController.onDetached();
         }
     }
-
 
 
 

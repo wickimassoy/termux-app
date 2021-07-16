@@ -19,6 +19,13 @@ public interface TerminalSessionClient {
 
     void onColorsChanged(TerminalSession session);
 
+    void onTerminalCursorStateChange(boolean state);
+
+
+
+    Integer getTerminalCursorStyle();
+
+
 
     void logError(String tag, String message);
 

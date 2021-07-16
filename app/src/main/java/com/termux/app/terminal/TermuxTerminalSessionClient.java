@@ -14,7 +14,7 @@ import android.widget.ListView;
 
 import com.termux.R;
 import com.termux.shared.shell.TermuxSession;
-import com.termux.shared.interact.DialogUtils;
+import com.termux.shared.interact.TextInputDialogUtils;
 import com.termux.app.TermuxActivity;
 import com.termux.shared.terminal.TermuxTerminalSessionClientBase;
 import com.termux.shared.termux.TermuxConstants;
@@ -37,19 +37,75 @@ public class TermuxTerminalSessionClient extends TermuxTerminalSessionClientBase
 
     private static final int MAX_SESSIONS = 8;
 
-    private final SoundPool mBellSoundPool = new SoundPool.Builder().setMaxStreams(1).setAudioAttributes(
-        new AudioAttributes.Builder().setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-            .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION).build()).build();
+    private SoundPool mBellSoundPool;
 
-    private final int mBellSoundId;
+    private int mBellSoundId;
 
     private static final String LOG_TAG = "TermuxTerminalSessionClient";
 
     public TermuxTerminalSessionClient(TermuxActivity activity) {
         this.mActivity = activity;
-
-        mBellSoundId = mBellSoundPool.load(activity, R.raw.bell, 1);
     }
+
+    /**
+     * Should be called when mActivity.onCreate() is called
+     */
+    public void onCreate() {
+        // Set terminal fonts and colors
+        checkForFontAndColors();
+    }
+
+    /**
+     * Should be called when mActivity.onStart() is called
+     */
+    public void onStart() {
+        // The service has connected, but data may have changed since we were last in the foreground.
+        // Get the session stored in shared preferences stored by {@link #onStop} if its valid,
+        // otherwise get the last session currently running.
+        if (mActivity.getTermuxService() != null) {
+            setCurrentSession(getCurrentStoredSessionOrLast());
+            termuxSessionListNotifyUpdated();
+        }
+
+        // The current terminal session may have changed while being away, force
+        // a refresh of the displayed terminal.
+        mActivity.getTerminalView().onScreenUpdated();
+    }
+
+    /**
+     * Should be called when mActivity.onResume() is called
+     */
+    public void onResume() {
+        // Just initialize the mBellSoundPool and load the sound, otherwise bell might not run
+        // the first time bell key is pressed and play() is called, since sound may not be loaded
+        // quickly enough before the call to play(). https://stackoverflow.com/questions/35435625
+        getBellSoundPool();
+    }
+
+    /**
+     * Should be called when mActivity.onStop() is called
+     */
+    public void onStop() {
+        // Store current session in shared preferences so that it can be restored later in
+        // {@link #onStart} if needed.
+        setCurrentStoredSession();
+
+        // Release mBellSoundPool resources, specially to prevent exceptions like the following to be thrown
+        // java.util.concurrent.TimeoutException: android.media.SoundPool.finalize() timed out after 10 seconds
+        // Bell is not played in background anyways
+        // Related: https://stackoverflow.com/a/28708351/14686958
+        releaseBellSoundPool();
+    }
+
+    /**
+     * Should be called when mActivity.reloadActivityStyling() is called
+     */
+    public void onReload() {
+        // Set terminal fonts and colors
+        checkForFontAndColors();
+    }
+
+
 
     @Override
     public void onTextChanged(TerminalSession changedSession) {
@@ -74,7 +130,9 @@ public class TermuxTerminalSessionClient extends TermuxTerminalSessionClientBase
 
     @Override
     public void onSessionFinished(final TerminalSession finishedSession) {
-        if (mActivity.getTermuxService().wantsToStop()) {
+        TermuxService service = mActivity.getTermuxService();
+
+        if (service == null || service.wantsToStop()) {
             // The service wants to stop as soon as possible.
             mActivity.finishActivityIfNotFinishing();
             return;
@@ -82,7 +140,7 @@ public class TermuxTerminalSessionClient extends TermuxTerminalSessionClientBase
 
         if (mActivity.isVisible() && finishedSession != mActivity.getCurrentSession()) {
             // Show toast for non-current sessions that exit.
-            int indexOfSession = mActivity.getTermuxService().getIndexOfSession(finishedSession);
+            int indexOfSession = service.getIndexOfSession(finishedSession);
             // Verify that session was not removed before we got told about it finishing:
             if (indexOfSession >= 0)
                 mActivity.showToast(toToastTitle(finishedSession) + " - exited", true);
@@ -91,7 +149,7 @@ public class TermuxTerminalSessionClient extends TermuxTerminalSessionClientBase
         if (mActivity.getPackageManager().hasSystemFeature(PackageManager.FEATURE_LEANBACK)) {
             // On Android TV devices we need to use older behaviour because we may
             // not be able to have multiple launcher icons.
-            if (mActivity.getTermuxService().getTermuxSessionsSize() > 1) {
+            if (service.getTermuxSessionsSize() > 1) {
                 removeFinishedSession(finishedSession);
             }
         } else {
@@ -120,19 +178,70 @@ public class TermuxTerminalSessionClient extends TermuxTerminalSessionClientBase
                 BellHandler.getInstance(mActivity).doBell();
                 break;
             case TermuxPropertyConstants.IVALUE_BELL_BEHAVIOUR_BEEP:
-                mBellSoundPool.play(mBellSoundId, 1.f, 1.f, 1, 0, 1.f);
+                getBellSoundPool().play(mBellSoundId, 1.f, 1.f, 1, 0, 1.f);
                 break;
             case TermuxPropertyConstants.IVALUE_BELL_BEHAVIOUR_IGNORE:
                 // Ignore the bell character.
                 break;
         }
-
     }
 
     @Override
     public void onColorsChanged(TerminalSession changedSession) {
         if (mActivity.getCurrentSession() == changedSession)
             updateBackgroundColor();
+    }
+
+    @Override
+    public void onTerminalCursorStateChange(boolean enabled) {
+        // Do not start cursor blinking thread if activity is not visible
+        if (enabled && !mActivity.isVisible()) {
+            Logger.logVerbose(LOG_TAG, "Ignoring call to start cursor blinking since activity is not visible");
+            return;
+        }
+
+        // If cursor is to enabled now, then start cursor blinking if blinking is enabled
+        // otherwise stop cursor blinking
+        mActivity.getTerminalView().setTerminalCursorBlinkerState(enabled, false);
+    }
+
+    /**
+     * Should be called when mActivity.onResetTerminalSession() is called
+     */
+    public void onResetTerminalSession() {
+        // Ensure blinker starts again after reset if cursor blinking was disabled before reset like
+        // with "tput civis" which would have called onTerminalCursorStateChange()
+        mActivity.getTerminalView().setTerminalCursorBlinkerState(true, true);
+    }
+
+
+
+    @Override
+    public Integer getTerminalCursorStyle() {
+        return mActivity.getProperties().getTerminalCursorStyle();
+    }
+
+
+
+    /** Initialize and get mBellSoundPool */
+    private synchronized SoundPool getBellSoundPool() {
+        if (mBellSoundPool == null) {
+            mBellSoundPool = new SoundPool.Builder().setMaxStreams(1).setAudioAttributes(
+                new AudioAttributes.Builder().setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION).build()).build();
+
+            mBellSoundId = mBellSoundPool.load(mActivity, R.raw.bell, 1);
+        }
+
+        return mBellSoundPool;
+    }
+
+    /** Release mBellSoundPool resources */
+    private synchronized void releaseBellSoundPool() {
+        if (mBellSoundPool != null) {
+            mBellSoundPool.release();
+            mBellSoundPool = null;
+        }
     }
 
 
@@ -155,12 +264,15 @@ public class TermuxTerminalSessionClient extends TermuxTerminalSessionClientBase
     void notifyOfSessionChange() {
         if (!mActivity.isVisible()) return;
 
-        TerminalSession session = mActivity.getCurrentSession();
-        mActivity.showToast(toToastTitle(session), false);
+        if (!mActivity.getProperties().areTerminalSessionChangeToastsDisabled()) {
+            TerminalSession session = mActivity.getCurrentSession();
+            mActivity.showToast(toToastTitle(session), false);
+        }
     }
 
     public void switchToSession(boolean forward) {
         TermuxService service = mActivity.getTermuxService();
+        if (service == null) return;
 
         TerminalSession currentTerminalSession = mActivity.getCurrentSession();
         int index = service.getIndexOfSession(currentTerminalSession);
@@ -177,7 +289,10 @@ public class TermuxTerminalSessionClient extends TermuxTerminalSessionClientBase
     }
 
     public void switchToSession(int index) {
-        TermuxSession termuxSession = mActivity.getTermuxService().getTermuxSession(index);
+        TermuxService service = mActivity.getTermuxService();
+        if (service == null) return;
+
+        TermuxSession termuxSession = service.getTermuxSession(index);
         if (termuxSession != null)
             setCurrentSession(termuxSession.getTerminalSession());
     }
@@ -186,14 +301,17 @@ public class TermuxTerminalSessionClient extends TermuxTerminalSessionClientBase
     public void renameSession(final TerminalSession sessionToRename) {
         if (sessionToRename == null) return;
 
-        DialogUtils.textInput(mActivity, R.string.title_rename_session, sessionToRename.mSessionName, R.string.action_rename_session_confirm, text -> {
+        TextInputDialogUtils.textInput(mActivity, R.string.title_rename_session, sessionToRename.mSessionName, R.string.action_rename_session_confirm, text -> {
             sessionToRename.mSessionName = text;
             termuxSessionListNotifyUpdated();
         }, -1, null, -1, null, null);
     }
 
     public void addNewSession(boolean isFailSafe, String sessionName) {
-        if (mActivity.getTermuxService().getTermuxSessionsSize() >= MAX_SESSIONS) {
+        TermuxService service = mActivity.getTermuxService();
+        if (service == null) return;
+
+        if (service.getTermuxSessionsSize() >= MAX_SESSIONS) {
             new AlertDialog.Builder(mActivity).setTitle(R.string.title_max_terminals_reached).setMessage(R.string.msg_max_terminals_reached)
                 .setPositiveButton(android.R.string.ok, null).show();
         } else {
@@ -206,7 +324,7 @@ public class TermuxTerminalSessionClient extends TermuxTerminalSessionClientBase
                 workingDirectory = currentSession.getCwd();
             }
 
-            TermuxSession newTermuxSession = mActivity.getTermuxService().createTermuxSession(null, null, null, workingDirectory, isFailSafe, sessionName);
+            TermuxSession newTermuxSession = service.createTermuxSession(null, null, null, workingDirectory, isFailSafe, sessionName);
             if (newTermuxSession == null) return;
 
             TerminalSession newTerminalSession = newTermuxSession.getTerminalSession();
@@ -226,14 +344,17 @@ public class TermuxTerminalSessionClient extends TermuxTerminalSessionClientBase
 
     /** The current session as stored or the last one if that does not exist. */
     public TerminalSession getCurrentStoredSessionOrLast() {
-        TerminalSession stored = getCurrentStoredSession(mActivity);
+        TerminalSession stored = getCurrentStoredSession();
 
         if (stored != null) {
             // If a stored session is in the list of currently running sessions, then return it
             return stored;
         } else {
             // Else return the last session currently running
-            TermuxSession termuxSession = mActivity.getTermuxService().getLastTermuxSession();
+            TermuxService service = mActivity.getTermuxService();
+            if (service == null) return null;
+
+            TermuxSession termuxSession = service.getLastTermuxSession();
             if (termuxSession != null)
                 return termuxSession.getTerminalSession();
             else
@@ -241,7 +362,7 @@ public class TermuxTerminalSessionClient extends TermuxTerminalSessionClientBase
         }
     }
 
-    private TerminalSession getCurrentStoredSession(TermuxActivity context) {
+    private TerminalSession getCurrentStoredSession() {
         String sessionHandle = mActivity.getPreferences().getCurrentSession();
 
         // If no session is stored in shared preferences
@@ -249,16 +370,20 @@ public class TermuxTerminalSessionClient extends TermuxTerminalSessionClientBase
             return null;
 
         // Check if the session handle found matches one of the currently running sessions
-        return context.getTermuxService().getTerminalSessionForHandle(sessionHandle);
+        TermuxService service = mActivity.getTermuxService();
+        if (service == null) return null;
+
+        return service.getTerminalSessionForHandle(sessionHandle);
     }
 
     public void removeFinishedSession(TerminalSession finishedSession) {
         // Return pressed with finished session - remove it.
         TermuxService service = mActivity.getTermuxService();
+        if (service == null) return;
 
         int index = service.removeTermuxSession(finishedSession);
 
-        int size = mActivity.getTermuxService().getTermuxSessionsSize();
+        int size = service.getTermuxSessionsSize();
         if (size == 0) {
             // There are no sessions to show, so finish the activity.
             mActivity.finishActivityIfNotFinishing();
@@ -278,7 +403,10 @@ public class TermuxTerminalSessionClient extends TermuxTerminalSessionClientBase
 
     public void checkAndScrollToSession(TerminalSession session) {
         if (!mActivity.isVisible()) return;
-        final int indexOfSession = mActivity.getTermuxService().getIndexOfSession(session);
+        TermuxService service = mActivity.getTermuxService();
+        if (service == null) return;
+
+        final int indexOfSession = service.getIndexOfSession(session);
         if (indexOfSession < 0) return;
         final ListView termuxSessionsListView = mActivity.findViewById(R.id.terminal_sessions_list);
         if (termuxSessionsListView == null) return;
@@ -290,7 +418,10 @@ public class TermuxTerminalSessionClient extends TermuxTerminalSessionClientBase
 
 
     String toToastTitle(TerminalSession session) {
-        final int indexOfSession = mActivity.getTermuxService().getIndexOfSession(session);
+        TermuxService service = mActivity.getTermuxService();
+        if (service == null) return null;
+
+        final int indexOfSession = service.getIndexOfSession(session);
         if (indexOfSession < 0) return null;
         StringBuilder toastTitle = new StringBuilder("[" + (indexOfSession + 1) + "]");
         if (!TextUtils.isEmpty(session.mSessionName)) {

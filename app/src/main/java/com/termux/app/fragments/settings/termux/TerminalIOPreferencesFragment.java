@@ -1,4 +1,4 @@
-package com.termux.app.fragments.settings;
+package com.termux.app.fragments.settings.termux;
 
 import android.content.Context;
 import android.os.Bundle;
@@ -16,10 +16,13 @@ public class TerminalIOPreferencesFragment extends PreferenceFragmentCompat {
 
     @Override
     public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
-        PreferenceManager preferenceManager = getPreferenceManager();
-        preferenceManager.setPreferenceDataStore(TerminalIOPreferencesDataStore.getInstance(getContext()));
+        Context context = getContext();
+        if (context == null) return;
 
-        setPreferencesFromResource(R.xml.terminal_io_preferences, rootKey);
+        PreferenceManager preferenceManager = getPreferenceManager();
+        preferenceManager.setPreferenceDataStore(TerminalIOPreferencesDataStore.getInstance(context));
+
+        setPreferencesFromResource(R.xml.termux_terminal_io_preferences, rootKey);
     }
 
 }
@@ -33,12 +36,12 @@ class TerminalIOPreferencesDataStore extends PreferenceDataStore {
 
     private TerminalIOPreferencesDataStore(Context context) {
         mContext = context;
-        mPreferences = new TermuxAppSharedPreferences(context);
+        mPreferences = TermuxAppSharedPreferences.build(context, true);
     }
 
     public static synchronized TerminalIOPreferencesDataStore getInstance(Context context) {
         if (mInstance == null) {
-            mInstance = new TerminalIOPreferencesDataStore(context.getApplicationContext());
+            mInstance = new TerminalIOPreferencesDataStore(context);
         }
         return mInstance;
     }
@@ -47,11 +50,15 @@ class TerminalIOPreferencesDataStore extends PreferenceDataStore {
 
     @Override
     public void putBoolean(String key, boolean value) {
+        if (mPreferences == null) return;
         if (key == null) return;
 
         switch (key) {
             case "soft_keyboard_enabled":
                     mPreferences.setSoftKeyboardEnabled(value);
+                break;
+            case "soft_keyboard_enabled_only_if_no_hardware":
+                mPreferences.setSoftKeyboardEnabledOnlyIfNoHardware(value);
                 break;
             default:
                 break;
@@ -60,9 +67,13 @@ class TerminalIOPreferencesDataStore extends PreferenceDataStore {
 
     @Override
     public boolean getBoolean(String key, boolean defValue) {
+        if (mPreferences == null) return false;
+
         switch (key) {
             case "soft_keyboard_enabled":
-                return mPreferences.getSoftKeyboardEnabled();
+                return mPreferences.isSoftKeyboardEnabled();
+            case "soft_keyboard_enabled_only_if_no_hardware":
+                return mPreferences.isSoftKeyboardEnabledOnlyIfNoHardware();
             default:
                 return false;
         }

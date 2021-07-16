@@ -3,6 +3,8 @@ package com.termux.shared.settings.properties;
 import com.google.common.collect.ImmutableBiMap;
 import com.termux.shared.termux.TermuxConstants;
 import com.termux.shared.logger.Logger;
+import com.termux.terminal.TerminalEmulator;
+import com.termux.view.TerminalView;
 
 import java.io.File;
 import java.util.Arrays;
@@ -10,7 +12,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 /*
- * Version: v0.6.0
+ * Version: v0.12.0
  *
  * Changelog
  *
@@ -33,6 +35,26 @@ import java.util.Set;
  *
  * - 0.6.0 (2021-04-07)
  *      - Updated javadocs.
+ *
+ * - 0.7.0 (2021-05-09)
+ *      - Add `*SOFT_KEYBOARD_TOGGLE_BEHAVIOUR*`.
+ *
+ * - 0.8.0 (2021-05-10)
+ *      - Change the `KEY_USE_BACK_KEY_AS_ESCAPE_KEY` and `KEY_VIRTUAL_VOLUME_KEYS_DISABLED` booleans
+ *          to `KEY_BACK_KEY_BEHAVIOUR` and `KEY_VOLUME_KEYS_BEHAVIOUR` String internal values.
+ *      - Renamed `SOFT_KEYBOARD_TOGGLE_BEHAVIOUR` to `KEY_SOFT_KEYBOARD_TOGGLE_BEHAVIOUR`.
+ *
+ * - 0.9.0 (2021-05-14)
+ *      - Add `*KEY_TERMINAL_CURSOR_BLINK_RATE*`.
+ *
+ * - 0.10.0 (2021-05-15)
+ *      - Add `MAP_BACK_KEY_BEHAVIOUR`, `MAP_SOFT_KEYBOARD_TOGGLE_BEHAVIOUR`, `MAP_VOLUME_KEYS_BEHAVIOUR`.
+ *
+ * - 0.11.0 (2021-06-10)
+ *      - Add `*KEY_TERMINAL_TRANSCRIPT_ROWS*`.
+ *
+ * - 0.12.0 (2021-06-10)
+ *      - Add `*KEY_TERMINAL_CURSOR_STYLE*`.
  */
 
 /**
@@ -48,11 +70,10 @@ import java.util.Set;
  */
 public final class TermuxPropertyConstants {
 
-    /** Defines the key for whether to use back key as the escape key */
-    public static final String KEY_USE_BACK_KEY_AS_ESCAPE_KEY =  "back-key"; // Default: "back-key"
+    /* boolean */
 
-    public static final String VALUE_BACK_KEY_BEHAVIOUR_BACK = "back";
-    public static final String VALUE_BACK_KEY_BEHAVIOUR_ESCAPE = "escape";
+    /** Defines the key for whether a toast will be shown when user changes the terminal session */
+    public static final String KEY_DISABLE_TERMINAL_SESSION_CHANGE_TOAST =  "disable-terminal-session-change-toast"; // Default: "disable-terminal-session-change-toast"
 
 
 
@@ -63,6 +84,11 @@ public final class TermuxPropertyConstants {
 
     /** Defines the key for whether to hide soft keyboard when termux app is started */
     public static final String KEY_HIDE_SOFT_KEYBOARD_ON_STARTUP =  "hide-soft-keyboard-on-startup"; // Default: "hide-soft-keyboard-on-startup"
+
+
+
+    /** Defines the key for whether url links in terminal transcript will automatically open on click or on tap */
+    public static final String KEY_TERMINAL_ONCLICK_URL_OPEN =  "terminal-onclick-url-open"; // Default: "terminal-onclick-url-open"
 
 
 
@@ -86,13 +112,9 @@ public final class TermuxPropertyConstants {
 
 
 
-    /** Defines the key for whether virtual volume keys are disabled */
-    public static final String KEY_VIRTUAL_VOLUME_KEYS_DISABLED =  "volume-keys"; // Default: "volume-keys"
-
-    public static final String VALUE_VOLUME_KEY_BEHAVIOUR_VOLUME = "volume";
-    public static final String VALUE_VOLUME_KEY_BEHAVIOUR_VIRTUAL = "virtual";
 
 
+    /* int */
 
     /** Defines the key for the bell behaviour */
     public static final String KEY_BELL_BEHAVIOUR =  "bell-character"; // Default: "bell-character"
@@ -117,13 +139,59 @@ public final class TermuxPropertyConstants {
 
 
 
-    /** Defines the key for the bell behaviour */
+    /** Defines the key for the terminal cursor blink rate */
+    public static final String KEY_TERMINAL_CURSOR_BLINK_RATE =  "terminal-cursor-blink-rate"; // Default: "terminal-cursor-blink-rate"
+    public static final int IVALUE_TERMINAL_CURSOR_BLINK_RATE_MIN = TerminalView.TERMINAL_CURSOR_BLINK_RATE_MIN;
+    public static final int IVALUE_TERMINAL_CURSOR_BLINK_RATE_MAX = TerminalView.TERMINAL_CURSOR_BLINK_RATE_MAX;
+    public static final int DEFAULT_IVALUE_TERMINAL_CURSOR_BLINK_RATE = 0;
+
+
+
+    /** Defines the key for the terminal cursor style */
+    public static final String KEY_TERMINAL_CURSOR_STYLE =  "terminal-cursor-style"; // Default: "terminal-cursor-style"
+
+    public static final String VALUE_TERMINAL_CURSOR_STYLE_BLOCK = "block";
+    public static final String VALUE_TERMINAL_CURSOR_STYLE_UNDERLINE = "underline";
+    public static final String VALUE_TERMINAL_CURSOR_STYLE_BAR = "bar";
+
+    public static final int IVALUE_TERMINAL_CURSOR_STYLE_BLOCK = TerminalEmulator.TERMINAL_CURSOR_STYLE_BLOCK;
+    public static final int IVALUE_TERMINAL_CURSOR_STYLE_UNDERLINE = TerminalEmulator.TERMINAL_CURSOR_STYLE_UNDERLINE;
+    public static final int IVALUE_TERMINAL_CURSOR_STYLE_BAR = TerminalEmulator.TERMINAL_CURSOR_STYLE_BAR;
+    public static final int DEFAULT_IVALUE_TERMINAL_CURSOR_STYLE = TerminalEmulator.DEFAULT_TERMINAL_CURSOR_STYLE;
+
+    /** Defines the bidirectional map for terminal cursor styles and their internal values */
+    public static final ImmutableBiMap<String, Integer> MAP_TERMINAL_CURSOR_STYLE =
+        new ImmutableBiMap.Builder<String, Integer>()
+            .put(VALUE_TERMINAL_CURSOR_STYLE_BLOCK, IVALUE_TERMINAL_CURSOR_STYLE_BLOCK)
+            .put(VALUE_TERMINAL_CURSOR_STYLE_UNDERLINE, IVALUE_TERMINAL_CURSOR_STYLE_UNDERLINE)
+            .put(VALUE_TERMINAL_CURSOR_STYLE_BAR, IVALUE_TERMINAL_CURSOR_STYLE_BAR)
+            .build();
+
+
+
+    /** Defines the key for the terminal transcript rows */
+    public static final String KEY_TERMINAL_TRANSCRIPT_ROWS =  "terminal-transcript-rows"; // Default: "terminal-transcript-rows"
+    public static final int IVALUE_TERMINAL_TRANSCRIPT_ROWS_MIN = TerminalEmulator.TERMINAL_TRANSCRIPT_ROWS_MIN;
+    public static final int IVALUE_TERMINAL_TRANSCRIPT_ROWS_MAX = TerminalEmulator.TERMINAL_TRANSCRIPT_ROWS_MAX;
+    public static final int DEFAULT_IVALUE_TERMINAL_TRANSCRIPT_ROWS = TerminalEmulator.DEFAULT_TERMINAL_TRANSCRIPT_ROWS;
+
+
+
+
+
+    /* float */
+
+    /** Defines the key for the terminal toolbar height */
     public static final String KEY_TERMINAL_TOOLBAR_HEIGHT_SCALE_FACTOR =  "terminal-toolbar-height"; // Default: "terminal-toolbar-height"
     public static final float IVALUE_TERMINAL_TOOLBAR_HEIGHT_SCALE_FACTOR_MIN = 0.4f;
     public static final float IVALUE_TERMINAL_TOOLBAR_HEIGHT_SCALE_FACTOR_MAX = 3;
     public static final float DEFAULT_IVALUE_TERMINAL_TOOLBAR_HEIGHT_SCALE_FACTOR = 1;
 
 
+
+
+
+    /* Integer */
 
     /** Defines the key for create session shortcut */
     public static final String KEY_SHORTCUT_CREATE_SESSION =  "shortcut.create-session"; // Default: "shortcut.create-session"
@@ -150,6 +218,26 @@ public final class TermuxPropertyConstants {
 
 
 
+
+
+    /* String */
+
+    /** Defines the key for whether back key will behave as escape key or literal back key */
+    public static final String KEY_BACK_KEY_BEHAVIOUR =  "back-key"; // Default: "back-key"
+
+    public static final String IVALUE_BACK_KEY_BEHAVIOUR_BACK = "back";
+    public static final String IVALUE_BACK_KEY_BEHAVIOUR_ESCAPE = "escape";
+    public static final String DEFAULT_IVALUE_BACK_KEY_BEHAVIOUR = IVALUE_BACK_KEY_BEHAVIOUR_BACK;
+
+    /** Defines the bidirectional map for back key behaviour values and their internal values */
+    public static final ImmutableBiMap<String, String> MAP_BACK_KEY_BEHAVIOUR =
+        new ImmutableBiMap.Builder<String, String>()
+            .put(IVALUE_BACK_KEY_BEHAVIOUR_BACK, IVALUE_BACK_KEY_BEHAVIOUR_BACK)
+            .put(IVALUE_BACK_KEY_BEHAVIOUR_ESCAPE, IVALUE_BACK_KEY_BEHAVIOUR_ESCAPE)
+            .build();
+
+
+
     /** Defines the key for the default working directory */
     public static final String KEY_DEFAULT_WORKING_DIRECTORY =  "default-working-directory"; // Default: "default-working-directory"
     /** Defines the default working directory */
@@ -159,10 +247,44 @@ public final class TermuxPropertyConstants {
 
     /** Defines the key for extra keys */
     public static final String KEY_EXTRA_KEYS =  "extra-keys"; // Default: "extra-keys"
+    //public static final String DEFAULT_IVALUE_EXTRA_KEYS = "[[ESC, TAB, CTRL, ALT, {key: '-', popup: '|'}, DOWN, UP]]"; // Single row
+    public static final String DEFAULT_IVALUE_EXTRA_KEYS = "[['ESC','/',{key: '-', popup: '|'},'HOME','UP','END','PGUP'], ['TAB','CTRL','ALT','LEFT','DOWN','RIGHT','PGDN']]"; // Double row
+
     /** Defines the key for extra keys style */
     public static final String KEY_EXTRA_KEYS_STYLE =  "extra-keys-style"; // Default: "extra-keys-style"
-    public static final String DEFAULT_IVALUE_EXTRA_KEYS = "[[ESC, TAB, CTRL, ALT, {key: '-', popup: '|'}, DOWN, UP]]";
     public static final String DEFAULT_IVALUE_EXTRA_KEYS_STYLE = "default";
+
+
+
+    /** Defines the key for whether toggle soft keyboard request will show/hide or enable/disable keyboard */
+    public static final String KEY_SOFT_KEYBOARD_TOGGLE_BEHAVIOUR =  "soft-keyboard-toggle-behaviour"; // Default: "soft-keyboard-toggle-behaviour"
+
+    public static final String IVALUE_SOFT_KEYBOARD_TOGGLE_BEHAVIOUR_SHOW_HIDE = "show/hide";
+    public static final String IVALUE_SOFT_KEYBOARD_TOGGLE_BEHAVIOUR_ENABLE_DISABLE = "enable/disable";
+    public static final String DEFAULT_IVALUE_SOFT_KEYBOARD_TOGGLE_BEHAVIOUR = IVALUE_SOFT_KEYBOARD_TOGGLE_BEHAVIOUR_SHOW_HIDE;
+
+    /** Defines the bidirectional map for toggle soft keyboard behaviour values and their internal values */
+    public static final ImmutableBiMap<String, String> MAP_SOFT_KEYBOARD_TOGGLE_BEHAVIOUR =
+        new ImmutableBiMap.Builder<String, String>()
+            .put(IVALUE_SOFT_KEYBOARD_TOGGLE_BEHAVIOUR_SHOW_HIDE, IVALUE_SOFT_KEYBOARD_TOGGLE_BEHAVIOUR_SHOW_HIDE)
+            .put(IVALUE_SOFT_KEYBOARD_TOGGLE_BEHAVIOUR_ENABLE_DISABLE, IVALUE_SOFT_KEYBOARD_TOGGLE_BEHAVIOUR_ENABLE_DISABLE)
+            .build();
+
+
+
+    /** Defines the key for whether volume keys will behave as virtual or literal volume keys */
+    public static final String KEY_VOLUME_KEYS_BEHAVIOUR =  "volume-keys"; // Default: "volume-keys"
+
+    public static final String IVALUE_VOLUME_KEY_BEHAVIOUR_VIRTUAL = "virtual";
+    public static final String IVALUE_VOLUME_KEY_BEHAVIOUR_VOLUME = "volume";
+    public static final String DEFAULT_IVALUE_VOLUME_KEYS_BEHAVIOUR = IVALUE_VOLUME_KEY_BEHAVIOUR_VIRTUAL;
+
+    /** Defines the bidirectional map for volume keys behaviour values and their internal values */
+    public static final ImmutableBiMap<String, String> MAP_VOLUME_KEYS_BEHAVIOUR =
+        new ImmutableBiMap.Builder<String, String>()
+            .put(IVALUE_VOLUME_KEY_BEHAVIOUR_VIRTUAL, IVALUE_VOLUME_KEY_BEHAVIOUR_VIRTUAL)
+            .put(IVALUE_VOLUME_KEY_BEHAVIOUR_VOLUME, IVALUE_VOLUME_KEY_BEHAVIOUR_VOLUME)
+            .build();
 
 
 
@@ -172,34 +294,40 @@ public final class TermuxPropertyConstants {
      * Setting this to {@code null} will make {@link SharedProperties} throw an exception.
      * */
     public static final Set<String> TERMUX_PROPERTIES_LIST = new HashSet<>(Arrays.asList(
-        // boolean
+        /* boolean */
+        KEY_DISABLE_TERMINAL_SESSION_CHANGE_TOAST,
         KEY_ENFORCE_CHAR_BASED_INPUT,
         KEY_HIDE_SOFT_KEYBOARD_ON_STARTUP,
-        KEY_USE_BACK_KEY_AS_ESCAPE_KEY,
+        KEY_TERMINAL_ONCLICK_URL_OPEN,
         KEY_USE_BLACK_UI,
         KEY_USE_CTRL_SPACE_WORKAROUND,
         KEY_USE_FULLSCREEN,
         KEY_USE_FULLSCREEN_WORKAROUND,
-        KEY_VIRTUAL_VOLUME_KEYS_DISABLED,
         TermuxConstants.PROP_ALLOW_EXTERNAL_APPS,
 
-        // int
+        /* int */
         KEY_BELL_BEHAVIOUR,
+        KEY_TERMINAL_CURSOR_BLINK_RATE,
+        KEY_TERMINAL_CURSOR_STYLE,
+        KEY_TERMINAL_TRANSCRIPT_ROWS,
 
-        // float
+        /* float */
         KEY_TERMINAL_TOOLBAR_HEIGHT_SCALE_FACTOR,
 
-        // Integer
+        /* Integer */
         KEY_SHORTCUT_CREATE_SESSION,
         KEY_SHORTCUT_NEXT_SESSION,
         KEY_SHORTCUT_PREVIOUS_SESSION,
         KEY_SHORTCUT_RENAME_SESSION,
 
-        // String
+        /* String */
+        KEY_BACK_KEY_BEHAVIOUR,
         KEY_DEFAULT_WORKING_DIRECTORY,
         KEY_EXTRA_KEYS,
-        KEY_EXTRA_KEYS_STYLE
-    ));
+        KEY_EXTRA_KEYS_STYLE,
+        KEY_SOFT_KEYBOARD_TOGGLE_BEHAVIOUR,
+        KEY_VOLUME_KEYS_BEHAVIOUR
+        ));
 
     /** Defines the set for keys loaded by termux that have default boolean behaviour
      * "true" -> true
@@ -207,8 +335,10 @@ public final class TermuxPropertyConstants {
      * default: false
      * */
     public static final Set<String> TERMUX_DEFAULT_BOOLEAN_BEHAVIOUR_PROPERTIES_LIST = new HashSet<>(Arrays.asList(
+        KEY_DISABLE_TERMINAL_SESSION_CHANGE_TOAST,
         KEY_ENFORCE_CHAR_BASED_INPUT,
         KEY_HIDE_SOFT_KEYBOARD_ON_STARTUP,
+        KEY_TERMINAL_ONCLICK_URL_OPEN,
         KEY_USE_CTRL_SPACE_WORKAROUND,
         KEY_USE_FULLSCREEN,
         KEY_USE_FULLSCREEN_WORKAROUND,

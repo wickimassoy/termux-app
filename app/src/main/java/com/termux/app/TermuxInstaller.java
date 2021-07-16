@@ -5,14 +5,19 @@ import android.app.AlertDialog;
 import android.app.ProgressDialog;
 import android.content.Context;
 import android.os.Environment;
-import android.os.UserManager;
 import android.system.Os;
 import android.util.Pair;
 import android.view.WindowManager;
 
 import com.termux.R;
+import com.termux.app.utils.CrashUtils;
 import com.termux.shared.file.FileUtils;
+import com.termux.shared.file.TermuxFileUtils;
+import com.termux.shared.interact.MessageDialogUtils;
 import com.termux.shared.logger.Logger;
+import com.termux.shared.markdown.MarkdownUtils;
+import com.termux.shared.models.errors.Error;
+import com.termux.shared.packages.PackageUtils;
 import com.termux.shared.termux.TermuxConstants;
 
 import java.io.BufferedReader;
@@ -50,15 +55,33 @@ final class TermuxInstaller {
 
     /** Performs bootstrap setup if necessary. */
     static void setupBootstrapIfNeeded(final Activity activity, final Runnable whenDone) {
+        String bootstrapErrorMessage;
+        Error filesDirectoryAccessibleError;
+
+        // This will also call Context.getFilesDir(), which should ensure that TERMUX_FILES_DIR_PATH
+        // is created if it does not already exist
+        filesDirectoryAccessibleError = TermuxFileUtils.isTermuxFilesDirectoryAccessible(activity, true, true);
+        boolean isFilesDirectoryAccessible = filesDirectoryAccessibleError == null;
+
         // Termux can only be run as the primary user (device owner) since only that
         // account has the expected file system paths. Verify that:
-        UserManager um = (UserManager) activity.getSystemService(Context.USER_SERVICE);
-        boolean isPrimaryUser = um.getSerialNumberForUser(android.os.Process.myUserHandle()) == 0;
-        if (!isPrimaryUser) {
-            String bootstrapErrorMessage = activity.getString(R.string.bootstrap_error_not_primary_user_message, TermuxConstants.TERMUX_PREFIX_DIR_PATH);
+        if (!PackageUtils.isCurrentUserThePrimaryUser(activity)) {
+            bootstrapErrorMessage = activity.getString(R.string.bootstrap_error_not_primary_user_message, MarkdownUtils.getMarkdownCodeForString(TermuxConstants.TERMUX_PREFIX_DIR_PATH, false));
             Logger.logError(LOG_TAG, bootstrapErrorMessage);
-            new AlertDialog.Builder(activity).setTitle(R.string.bootstrap_error_title).setMessage(bootstrapErrorMessage)
-                .setOnDismissListener(dialog -> System.exit(0)).setPositiveButton(android.R.string.ok, null).show();
+            CrashUtils.sendCrashReportNotification(activity, LOG_TAG, "## Bootstrap Error\n\n" + bootstrapErrorMessage, true, true);
+            MessageDialogUtils.exitAppWithErrorMessage(activity,
+                activity.getString(R.string.bootstrap_error_title),
+                bootstrapErrorMessage);
+            return;
+        }
+
+        if (!isFilesDirectoryAccessible) {
+            bootstrapErrorMessage = Error.getMinimalErrorString(filesDirectoryAccessibleError) + "\nTERMUX_FILES_DIR: " + MarkdownUtils.getMarkdownCodeForString(TermuxConstants.TERMUX_FILES_DIR_PATH, false);
+            Logger.logError(LOG_TAG, bootstrapErrorMessage);
+            CrashUtils.sendCrashReportNotification(activity, LOG_TAG, "## Bootstrap Error\n\n" + bootstrapErrorMessage, true, true);
+            MessageDialogUtils.showMessage(activity,
+                activity.getString(R.string.bootstrap_error_title),
+                bootstrapErrorMessage, null);
             return;
         }
 
@@ -67,14 +90,14 @@ final class TermuxInstaller {
 
         // If prefix directory exists, even if its a symlink to a valid directory and symlink is not broken/dangling
         if (FileUtils.directoryFileExists(PREFIX_FILE_PATH, true)) {
-             File[] PREFIX_FILE_LIST =  PREFIX_FILE.listFiles();
+            File[] PREFIX_FILE_LIST =  PREFIX_FILE.listFiles();
             // If prefix directory is empty or only contains the tmp directory
-             if(PREFIX_FILE_LIST == null || PREFIX_FILE_LIST.length == 0 || (PREFIX_FILE_LIST.length == 1 && TermuxConstants.TERMUX_TMP_PREFIX_DIR_PATH.equals(PREFIX_FILE_LIST[0].getAbsolutePath()))) {
-                 Logger.logInfo(LOG_TAG, "The prefix directory \"" + PREFIX_FILE_PATH + "\" exists but is empty or only contains the tmp directory.");
-             } else {
-                 whenDone.run();
-                 return;
-             }
+            if(PREFIX_FILE_LIST == null || PREFIX_FILE_LIST.length == 0 || (PREFIX_FILE_LIST.length == 1 && TermuxConstants.TERMUX_TMP_PREFIX_DIR_PATH.equals(PREFIX_FILE_LIST[0].getAbsolutePath()))) {
+                Logger.logInfo(LOG_TAG, "The prefix directory \"" + PREFIX_FILE_PATH + "\" exists but is empty or only contains the tmp directory.");
+            } else {
+                whenDone.run();
+                return;
+            }
         } else if (FileUtils.fileExists(PREFIX_FILE_PATH, false)) {
             Logger.logInfo(LOG_TAG, "The prefix directory \"" + PREFIX_FILE_PATH + "\" does not exist but another file exists at its destination.");
         }
@@ -86,21 +109,23 @@ final class TermuxInstaller {
                 try {
                     Logger.logInfo(LOG_TAG, "Installing " + TermuxConstants.TERMUX_APP_NAME + " bootstrap packages.");
 
-                    String errmsg;
+                    Error error;
 
                     final String STAGING_PREFIX_PATH = TermuxConstants.TERMUX_STAGING_PREFIX_DIR_PATH;
                     final File STAGING_PREFIX_FILE = new File(STAGING_PREFIX_PATH);
 
                     // Delete prefix staging directory or any file at its destination
-                    errmsg = FileUtils.deleteFile(activity, "prefix staging directory", STAGING_PREFIX_PATH, true);
-                    if (errmsg != null) {
-                        throw new RuntimeException(errmsg);
+                    error = FileUtils.deleteFile("prefix staging directory", STAGING_PREFIX_PATH, true);
+                    if (error != null) {
+                        showBootstrapErrorDialog(activity, PREFIX_FILE_PATH, whenDone, Error.getErrorMarkdownString(error));
+                        return;
                     }
 
                     // Delete prefix directory or any file at its destination
-                    errmsg = FileUtils.deleteFile(activity, "prefix directory", PREFIX_FILE_PATH, true);
-                    if (errmsg != null) {
-                        throw new RuntimeException(errmsg);
+                    error = FileUtils.deleteFile("prefix directory", PREFIX_FILE_PATH, true);
+                    if (error != null) {
+                        showBootstrapErrorDialog(activity, PREFIX_FILE_PATH, whenDone, Error.getErrorMarkdownString(error));
+                        return;
                     }
 
                     Logger.logInfo(LOG_TAG, "Extracting bootstrap zip to prefix staging directory \"" + STAGING_PREFIX_PATH + "\".");
@@ -123,14 +148,22 @@ final class TermuxInstaller {
                                     String newPath = STAGING_PREFIX_PATH + "/" + parts[1];
                                     symlinks.add(Pair.create(oldPath, newPath));
 
-                                    ensureDirectoryExists(activity, new File(newPath).getParentFile());
+                                    error = ensureDirectoryExists(new File(newPath).getParentFile());
+                                    if (error != null) {
+                                        showBootstrapErrorDialog(activity, PREFIX_FILE_PATH, whenDone, Error.getErrorMarkdownString(error));
+                                        return;
+                                    }
                                 }
                             } else {
                                 String zipEntryName = zipEntry.getName();
                                 File targetFile = new File(STAGING_PREFIX_PATH, zipEntryName);
                                 boolean isDirectory = zipEntry.isDirectory();
 
-                                ensureDirectoryExists(activity, isDirectory ? targetFile : targetFile.getParentFile());
+                                error = ensureDirectoryExists(isDirectory ? targetFile : targetFile.getParentFile());
+                                if (error != null) {
+                                    showBootstrapErrorDialog(activity, PREFIX_FILE_PATH, whenDone, Error.getErrorMarkdownString(error));
+                                    return;
+                                }
 
                                 if (!isDirectory) {
                                     try (FileOutputStream outStream = new FileOutputStream(targetFile)) {
@@ -138,7 +171,8 @@ final class TermuxInstaller {
                                         while ((readBytes = zipInput.read(buffer)) != -1)
                                             outStream.write(buffer, 0, readBytes);
                                     }
-                                    if (zipEntryName.startsWith("bin/") || zipEntryName.startsWith("libexec") || zipEntryName.startsWith("lib/apt/methods")) {
+                                    if (zipEntryName.startsWith("bin/") || zipEntryName.startsWith("libexec") ||
+                                        zipEntryName.startsWith("lib/apt/apt-helper") || zipEntryName.startsWith("lib/apt/methods")) {
                                         //noinspection OctalInteger
                                         Os.chmod(targetFile.getAbsolutePath(), 0700);
                                     }
@@ -161,22 +195,10 @@ final class TermuxInstaller {
 
                     Logger.logInfo(LOG_TAG, "Bootstrap packages installed successfully.");
                     activity.runOnUiThread(whenDone);
+
                 } catch (final Exception e) {
-                    Logger.logStackTraceWithMessage(LOG_TAG, "Bootstrap error", e);
-                    activity.runOnUiThread(() -> {
-                        try {
-                            new AlertDialog.Builder(activity).setTitle(R.string.bootstrap_error_title).setMessage(R.string.bootstrap_error_body)
-                                .setNegativeButton(R.string.bootstrap_error_abort, (dialog, which) -> {
-                                    dialog.dismiss();
-                                    activity.finish();
-                                }).setPositiveButton(R.string.bootstrap_error_try_again, (dialog, which) -> {
-                                dialog.dismiss();
-                                TermuxInstaller.setupBootstrapIfNeeded(activity, whenDone);
-                            }).show();
-                        } catch (WindowManager.BadTokenException e1) {
-                            // Activity already dismissed - ignore.
-                        }
-                    });
+                    showBootstrapErrorDialog(activity, PREFIX_FILE_PATH, whenDone, Logger.getStackTracesMarkdownString(null, Logger.getStackTracesStringArray(e)));
+
                 } finally {
                     activity.runOnUiThread(() -> {
                         try {
@@ -190,6 +212,30 @@ final class TermuxInstaller {
         }.start();
     }
 
+    public static void showBootstrapErrorDialog(Activity activity, String PREFIX_FILE_PATH, Runnable whenDone, String message) {
+        Logger.logErrorExtended(LOG_TAG, "Bootstrap Error:\n" + message);
+
+        // Send a notification with the exception so that the user knows why bootstrap setup failed
+        CrashUtils.sendCrashReportNotification(activity, LOG_TAG, "## Bootstrap Error\n\n" + message, true, true);
+
+        activity.runOnUiThread(() -> {
+            try {
+                new AlertDialog.Builder(activity).setTitle(R.string.bootstrap_error_title).setMessage(R.string.bootstrap_error_body)
+                    .setNegativeButton(R.string.bootstrap_error_abort, (dialog, which) -> {
+                        dialog.dismiss();
+                        activity.finish();
+                    })
+                    .setPositiveButton(R.string.bootstrap_error_try_again, (dialog, which) -> {
+                        dialog.dismiss();
+                        FileUtils.deleteFile("prefix directory", PREFIX_FILE_PATH, true);
+                        TermuxInstaller.setupBootstrapIfNeeded(activity, whenDone);
+                    }).show();
+            } catch (WindowManager.BadTokenException e1) {
+                // Activity already dismissed - ignore.
+            }
+        });
+    }
+
     static void setupStorageSymlinks(final Context context) {
         final String LOG_TAG = "termux-storage";
 
@@ -198,12 +244,14 @@ final class TermuxInstaller {
         new Thread() {
             public void run() {
                 try {
-                    String errmsg;
+                    Error error;
                     File storageDir = TermuxConstants.TERMUX_STORAGE_HOME_DIR;
 
-                    errmsg = FileUtils.clearDirectory(context, "~/storage", storageDir.getAbsolutePath());
-                    if (errmsg != null) {
-                        Logger.logErrorAndShowToast(context, LOG_TAG, errmsg);
+                    error = FileUtils.clearDirectory("~/storage", storageDir.getAbsolutePath());
+                    if (error != null) {
+                        Logger.logErrorAndShowToast(context, LOG_TAG, error.getMessage());
+                        Logger.logErrorExtended(LOG_TAG, "Setup Storage Error\n" + error.toString());
+                        CrashUtils.sendCrashReportNotification(context, LOG_TAG, "## Setup Storage Error\n\n" + Error.getErrorMarkdownString(error), true, true);
                         return;
                     }
 
@@ -240,19 +288,16 @@ final class TermuxInstaller {
 
                     Logger.logInfo(LOG_TAG, "Storage symlinks created successfully.");
                 } catch (Exception e) {
-                    Logger.logStackTraceWithMessage(LOG_TAG, "Error setting up link", e);
+                    Logger.logErrorAndShowToast(context, LOG_TAG, e.getMessage());
+                    Logger.logStackTraceWithMessage(LOG_TAG, "Setup Storage Error: Error setting up link", e);
+                    CrashUtils.sendCrashReportNotification(context, LOG_TAG, "## Setup Storage Error\n\n" + Logger.getStackTracesMarkdownString(null, Logger.getStackTracesStringArray(e)), true, true);
                 }
             }
         }.start();
     }
 
-    private static void ensureDirectoryExists(Context context, File directory) {
-        String errmsg;
-
-        errmsg = FileUtils.createDirectoryFile(context, directory.getAbsolutePath());
-        if (errmsg != null) {
-            throw new RuntimeException(errmsg);
-        }
+    private static Error ensureDirectoryExists(File directory) {
+        return FileUtils.createDirectoryFile(directory.getAbsolutePath());
     }
 
     public static byte[] loadZipBytes() {

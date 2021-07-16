@@ -1,4 +1,4 @@
-package com.termux.app.activities;
+package com.termux.shared.activities;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.ActionBar;
@@ -14,11 +14,11 @@ import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 
-import com.termux.R;
+import com.termux.shared.R;
 import com.termux.shared.termux.TermuxConstants;
 import com.termux.shared.markdown.MarkdownUtils;
 import com.termux.shared.interact.ShareUtils;
-import com.termux.app.models.ReportInfo;
+import com.termux.shared.models.ReportInfo;
 
 import org.commonmark.node.FencedCodeBlock;
 
@@ -92,8 +92,8 @@ public class ReportActivity extends AppCompatActivity {
 
         final Markwon markwon = MarkdownUtils.getRecyclerMarkwonBuilder(this);
 
-        final MarkwonAdapter adapter = MarkwonAdapter.builderTextViewIsRoot(R.layout.activity_report_adapter_node_default)
-            .include(FencedCodeBlock.class, SimpleEntry.create(R.layout.activity_report_adapter_node_code_block, R.id.code_text_view))
+        final MarkwonAdapter adapter = MarkwonAdapter.builderTextViewIsRoot(R.layout.markdown_adapter_node_default)
+            .include(FencedCodeBlock.class, SimpleEntry.create(R.layout.markdown_adapter_node_code_block, R.id.code_text_view))
             .build();
 
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
